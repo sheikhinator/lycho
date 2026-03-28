@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getAuthContext, auditLog, ok, err } from '@/lib/api'
+import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
+import { sanitiseInput } from '@/lib/sanitise'
 
 // GET /api/agents — list all agents for the authenticated tenant
 export async function GET() {
@@ -22,6 +23,9 @@ export async function GET() {
 
 // POST /api/agents — create a new agent
 export async function POST(req: NextRequest) {
+  const rl = await rateGuard(req)
+  if (rl) return rl
+
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -41,6 +45,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (!body.agent_type) return err('agent_type is required', 'VALIDATION_ERROR', 400)
+
+  if (body.display_name) {
+    const s = sanitiseInput(body.display_name)
+    if (!s.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
+    body.display_name = s.cleaned
+  }
 
   // Create the agent
   const { data: agent, error: insertError } = await supabase

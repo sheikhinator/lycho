@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getAuthContext, auditLog, ok, err } from '@/lib/api'
+import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
+import { sanitiseInput } from '@/lib/sanitise'
 
 // GET /api/conversations — filtered list for tenant
 // Query params: agent_id, status, channel, search, page (1-based), limit
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/conversations — create a new conversation (Phase 2 stub)
 export async function POST(req: NextRequest) {
+  const rl = await rateGuard(req)
+  if (rl) return rl
+
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -63,6 +67,14 @@ export async function POST(req: NextRequest) {
   if (!body.channel)            return err('channel is required', 'VALIDATION_ERROR', 400)
   if (!body.contact_identifier) return err('contact_identifier is required', 'VALIDATION_ERROR', 400)
   if (!body.message)            return err('message is required', 'VALIDATION_ERROR', 400)
+
+  const siContact = sanitiseInput(body.contact_identifier)
+  if (!siContact.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
+  body.contact_identifier = siContact.cleaned
+
+  const siMessage = sanitiseInput(body.message)
+  if (!siMessage.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
+  body.message = siMessage.cleaned
 
   // Verify agent belongs to tenant
   const { data: agent, error: agentError } = await supabase

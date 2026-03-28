@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase-server'
-import { ok, err } from '@/lib/api'
+import { ok, err, rateGuard, AUTH_LIMITS } from '@/lib/api'
+import { sanitiseInput } from '@/lib/sanitise'
 
 function generateReferralCode(length = 8): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -9,6 +10,9 @@ function generateReferralCode(length = 8): string {
 
 // POST /api/waitlist — add to waitlist and send welcome email
 export async function POST(req: NextRequest) {
+  const rl = await rateGuard(req, AUTH_LIMITS)
+  if (rl) return rl
+
   let body: { email: string; name?: string; business_type?: string }
   try {
     body = await req.json()
@@ -19,6 +23,13 @@ export async function POST(req: NextRequest) {
   if (!body.email) return err('email is required', 'VALIDATION_ERROR', 400)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
     return err('Invalid email address', 'VALIDATION_ERROR', 400)
+  }
+
+  // Sanitise text inputs
+  if (body.name) {
+    const s = sanitiseInput(body.name)
+    if (!s.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
+    body.name = s.cleaned
   }
 
   const supabase = createServerSupabase()

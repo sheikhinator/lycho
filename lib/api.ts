@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from './supabase-server'
+import { checkRateLimit, DEFAULT_LIMITS, AUTH_LIMITS } from './rate-limit'
+import type { RateLimitOptions } from './rate-limit'
 
 // ─── Response helpers ─────────────────────────────────────────────────────────
 
@@ -11,6 +13,17 @@ export function err(error: string, code: string, status = 400) {
   return NextResponse.json({ error, code }, { status })
 }
 
+// ─── Rate limit guard ─────────────────────────────────────────────────────────
+
+export async function rateGuard(
+  req: NextRequest,
+  opts: RateLimitOptions = DEFAULT_LIMITS,
+): Promise<NextResponse | null> {
+  return checkRateLimit(req, opts)
+}
+
+export { AUTH_LIMITS }
+
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
 export async function getAuthContext() {
@@ -18,7 +31,6 @@ export async function getAuthContext() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return null
 
-  // Resolve tenant_id from users table
   const { data: userRow } = await supabase
     .from('users')
     .select('tenant_id')
