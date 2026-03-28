@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, RotateCcw, Copy, Check, Code2, ExternalLink } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { ChannelIcon } from '@/components/ui/ChannelIcon'
@@ -24,6 +24,7 @@ interface Agent {
   interactions_count: number
   monthly_cost_pkr: number
   monthly_value_pkr: number
+  widget_token: string | null
   created_at: string
 }
 
@@ -402,9 +403,110 @@ function VersionHistoryTab({ agentId, currentVersion }: { agentId: string; curre
   )
 }
 
+// ─── Widget tab ───────────────────────────────────────────────────────────────
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.vercel.app'
+
+function WidgetTab({ agent }: { agent: Agent }) {
+  const [copied, setCopied] = useState(false)
+
+  const embedCode = agent.widget_token
+    ? `<script src="${APP_URL}/widget.js" data-token="${agent.widget_token}"></script>`
+    : null
+
+  function handleCopy() {
+    if (!embedCode) return
+    navigator.clipboard.writeText(embedCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (!agent.widget_token) {
+    return (
+      <div className="rounded-xl p-8 text-center" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <p className="text-sm font-sans mb-4" style={{ color: '#6b6b6b' }}>
+          This agent doesn&apos;t have a widget token yet. Run the following in your Supabase SQL editor:
+        </p>
+        <code className="block text-xs font-mono p-4 rounded-lg text-left" style={{ background: '#1c1c1c', color: '#C9A84C', border: '1px solid #2a2a2a' }}>
+          {`ALTER TABLE agents ADD COLUMN IF NOT EXISTS widget_token text UNIQUE;\nUPDATE agents SET widget_token = gen_random_uuid()::text WHERE widget_token IS NULL;`}
+        </code>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      {/* Embed code */}
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2a2a' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ background: '#141414', borderBottom: '1px solid #2a2a2a' }}>
+          <div className="flex items-center gap-2">
+            <Code2 size={15} style={{ color: '#C9A84C' }} />
+            <span className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>Embed Code</span>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg transition-colors"
+            style={copied
+              ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }
+              : { background: '#1c1c1c', color: '#F0EBE1', border: '1px solid #2a2a2a' }
+            }
+          >
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <div className="p-5" style={{ background: '#0d0d0d' }}>
+          <code className="text-xs font-mono break-all leading-relaxed" style={{ color: '#C9A84C' }}>
+            {embedCode}
+          </code>
+        </div>
+      </div>
+
+      {/* Domain note */}
+      <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
+        When your domain changes to <span style={{ color: '#C9A84C' }}>lycho.ai</span> — update the{' '}
+        <code style={{ color: '#F0EBE1' }}>src</code> URL in the script tag.
+      </p>
+
+      {/* Steps */}
+      <div className="rounded-xl p-6 space-y-4" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <p className="text-xs font-sans uppercase tracking-widest mb-2" style={{ color: '#6b6b6b' }}>Installation</p>
+        {[
+          { n: '01', text: 'Copy the code above' },
+          { n: '02', text: "Open your website's HTML file" },
+          { n: '03', text: 'Paste before the closing </body> tag' },
+          { n: '04', text: 'Save and refresh — your LYCHO agent is live' },
+        ].map(step => (
+          <div key={step.n} className="flex items-start gap-4">
+            <span className="font-bebas text-2xl shrink-0" style={{ color: '#C9A84C', letterSpacing: '0.05em', lineHeight: 1 }}>{step.n}</span>
+            <p className="text-sm font-sans pt-0.5" style={{ color: '#F0EBE1' }}>{step.text}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Preview link */}
+      <div className="rounded-xl p-5 flex items-center justify-between" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <div>
+          <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>Live Preview</p>
+          <p className="text-xs font-sans mt-0.5" style={{ color: '#6b6b6b' }}>Open the widget chat in a new tab</p>
+        </div>
+        <a
+          href={`${APP_URL}/widget/${agent.widget_token}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-xs font-sans px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
+          style={{ background: '#C9A84C', color: '#070707' }}
+        >
+          Preview <ExternalLink size={12} />
+        </a>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'config' | 'versions'
+type Tab = 'overview' | 'config' | 'versions' | 'widget'
 
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -448,6 +550,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     { key: 'overview', label: 'Overview' },
     { key: 'config',   label: 'Configuration' },
     { key: 'versions', label: 'Version History' },
+    { key: 'widget',   label: 'Widget' },
   ]
 
   return (
@@ -519,6 +622,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
               {activeTab === 'versions' && (
                 <VersionHistoryTab agentId={agent.id} currentVersion={agent.version} />
               )}
+              {activeTab === 'widget' && <WidgetTab agent={agent} />}
             </>
           )}
         </main>
