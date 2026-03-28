@@ -121,13 +121,15 @@ function TypingIndicator() {
 export default function ChatPage() {
   const { toast } = useToast()
 
+  const CONTACT_ID = 'test-master'
+
   const [agents, setAgents]               = useState<Agent[]>([])
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [messages, setMessages]           = useState<ChatMessage[]>([])
   const [input, setInput]                 = useState('')
   const [typing, setTyping]               = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [convMeta, setConvMeta]           = useState<ConversationMeta | null>(null)
-  const [contactId]                       = useState(() => `test-${Date.now()}`)
   const [profileOpen, setProfileOpen]     = useState(true)
 
   const bottomRef  = useRef<HTMLDivElement>(null)
@@ -135,14 +137,64 @@ export default function ChatPage() {
 
   useEffect(() => { document.title = 'Test Agents — LYCHO' }, [])
 
-  // Load agents
+  // Load history for a given agent
+  const loadHistory = useCallback(async (agent: Agent) => {
+    setLoadingHistory(true)
+    setMessages([])
+    setConvMeta(null)
+    try {
+      const params = new URLSearchParams({
+        agent_id: agent.id,
+        status: 'open',
+        search: CONTACT_ID,
+        limit: '1',
+      })
+      const res = await fetch(`/api/conversations?${params}`)
+      if (!res.ok) return
+      const json = await res.json()
+      const convs: Record<string, unknown>[] = json.data?.conversations ?? []
+      if (convs.length === 0) return
+
+      const conv = convs[0]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawMessages: any[] = (conv.messages as any[]) ?? []
+      const loaded: ChatMessage[] = rawMessages.map(m => ({
+        role:      m.role as 'user' | 'assistant',
+        content:   m.content as string,
+        timestamp: m.timestamp ?? new Date().toISOString(),
+      }))
+      setMessages(loaded)
+
+      // Restore convMeta from stored metadata
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const meta = conv.metadata as any
+      if (meta) {
+        setConvMeta({
+          lead_score:            meta.lead_score ?? 50,
+          lead_label:            meta.lead_label ?? 'warm',
+          sentiment:             meta.sentiment ?? 'neutral',
+          contact_profile:       meta.contact_profile ?? {},
+          suggested_next_action: meta.suggested_next_action ?? 'continue',
+        })
+      }
+    } catch {
+      // History load is non-fatal
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [])
+
+  // Load agents, then load history for first agent
   useEffect(() => {
     fetch('/api/agents')
       .then(r => r.json())
       .then(j => {
         const list: Agent[] = (j.data ?? []).filter((a: Agent) => a.status !== 'deleted')
         setAgents(list)
-        if (list.length > 0) setSelectedAgent(list[0])
+        if (list.length > 0) {
+          setSelectedAgent(list[0])
+          loadHistory(list[0])
+        }
       })
       .catch(() => toast('Failed to load agents', 'error'))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -157,6 +209,12 @@ export default function ChatPage() {
     setMessages([])
     setConvMeta(null)
     setInput('')
+  }
+
+  function selectAgent(agent: Agent) {
+    setSelectedAgent(agent)
+    setInput('')
+    loadHistory(agent)
   }
 
   const sendMessage = useCallback(async () => {
@@ -179,7 +237,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           agent_id:           selectedAgent.id,
           channel:            'web',
-          contact_identifier: contactId,
+          contact_identifier: CONTACT_ID,
           message:            userMsg.content,
         }),
       })
@@ -219,7 +277,7 @@ export default function ChatPage() {
       setTyping(false)
       inputRef.current?.focus()
     }
-  }, [input, selectedAgent, typing, contactId, toast])
+  }, [input, selectedAgent, typing, toast])
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -261,7 +319,7 @@ export default function ChatPage() {
                   return (
                     <button
                       key={agent.id}
-                      onClick={() => { setSelectedAgent(agent); resetChat() }}
+                      onClick={() => selectAgent(agent)}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
                       style={{
                         background:   active ? 'rgba(201,168,76,0.07)' : 'transparent',
@@ -358,7 +416,18 @@ export default function ChatPage() {
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-5 space-y-4">
-                  {messages.length === 0 && (
+                  {loadingHistory && (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 pb-10">
+                      <div className="flex items-center gap-1.5">
+                        {[0, 150, 300].map(d => (
+                          <span key={d} className="w-1.5 h-1.5 rounded-full" style={{ background: '#C9A84C', animation: `pulse 1.2s ease-in-out ${d}ms infinite` }} />
+                        ))}
+                      </div>
+                      <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Loading conversation…</p>
+                    </div>
+                  )}
+
+                  {!loadingHistory && messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-3 pb-10">
                       <div
                         className="w-12 h-12 rounded-full flex items-center justify-center"
