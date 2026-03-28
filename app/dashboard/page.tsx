@@ -350,7 +350,7 @@ export default async function DashboardPage() {
                 in value this month
               </p>
             </div>
-            <div className="flex items-center gap-2 text-right max-w-[220px]">
+            <div className="flex items-center gap-2 text-right min-w-0 shrink-0 basis-[240px]">
               <Zap size={16} className="shrink-0" style={{ color: '#C9A84C', opacity: 0.5 }} />
               <p className="text-xs leading-relaxed" style={{ color: '#6b6b6b' }}>
                 Deploy your first agent to start tracking ROI
