@@ -40,7 +40,7 @@ export function Modal({
       />
       <div className="relative bg-deep border border-border rounded-xl w-full max-w-md mx-4 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-bebas text-xl tracking-widest text-ivory">{title}</h2>
+          <h2 className="font-sans text-base font-semibold tracking-wide text-ivory">{title}</h2>
           <button
             onClick={onClose}
             className="text-muted hover:text-ivory transition-colors p-0.5"

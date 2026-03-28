@@ -7,21 +7,25 @@ import {
   Store, CreditCard, Settings,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
+import { useToast } from '@/components/providers/ToastProvider'
 
 const NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',     href: '/dashboard' },
-  { icon: Bot,             label: 'Agents',         href: '/agents' },
-  { icon: MessageSquare,   label: 'Conversations',  href: '/conversations' },
-  { icon: Store,           label: 'Marketplace',    href: '/marketplace' },
-  { icon: CreditCard,      label: 'Billing',        href: '/billing' },
-  { icon: Settings,        label: 'Settings',       href: '/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard',        routed: true  },
+  { icon: Bot,             label: 'Agents',        href: '/dashboard/agents', routed: true  },
+  { icon: MessageSquare,   label: 'Conversations', href: '#',                 routed: false },
+  { icon: Store,           label: 'Marketplace',   href: '#',                 routed: false },
+  { icon: CreditCard,      label: 'Billing',       href: '#',                 routed: false },
+  { icon: Settings,        label: 'Settings',      href: '#',                 routed: false },
 ]
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const { toast } = useToast()
 
   const isActive = (href: string) =>
-    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+    href === '/dashboard'
+      ? pathname === '/dashboard'
+      : pathname.startsWith(href)
 
   return (
     <aside
@@ -38,19 +42,41 @@ export function DashboardSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ icon: Icon, label, href }) => {
-          const active = isActive(href)
+        {NAV.map(({ icon: Icon, label, href, routed }) => {
+          const active = routed && isActive(href)
+
+          const itemStyle = {
+            color:       active ? '#C9A84C' : '#6b6b6b',
+            background:  active ? 'rgba(201,168,76,0.05)' : 'transparent',
+            borderLeft:  active ? '2px solid #C9A84C' : '2px solid transparent',
+            paddingLeft: '10px',
+          }
+
+          const itemClass =
+            'flex items-center gap-3 px-3 py-2.5 rounded text-sm font-sans transition-colors w-full text-left'
+
+          if (!routed) {
+            return (
+              <button
+                key={label}
+                className={itemClass}
+                style={itemStyle}
+                onClick={() => toast('Coming soon — this feature is being built.', 'info')}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#C9A84C')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b6b6b')}
+              >
+                <Icon size={16} className="shrink-0" />
+                <span>{label}</span>
+              </button>
+            )
+          }
+
           return (
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded text-sm transition-colors"
-              style={{
-                color:      active ? '#C9A84C' : '#6b6b6b',
-                background: active ? 'rgba(201,168,76,0.05)' : 'transparent',
-                borderLeft: active ? '2px solid #C9A84C' : '2px solid transparent',
-                paddingLeft: '10px',
-              }}
+              className={itemClass}
+              style={itemStyle}
               onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.color = '#C9A84C' }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.color = '#6b6b6b' }}
             >
