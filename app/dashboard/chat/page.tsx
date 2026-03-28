@@ -78,6 +78,14 @@ function sentimentEmoji(sentiment: string) {
   return map[sentiment] ?? '😐'
 }
 
+// ─── Model label ─────────────────────────────────────────────────────────────
+
+const COMPLEX_TYPES = ['research_agent', 'research', 'analyst_agent', 'analyst', 'compliance_agent', 'compliance']
+
+function getModelLabel(agentType: string): string {
+  return COMPLEX_TYPES.includes(agentType) ? 'Sonnet 4.6' : 'Haiku 4.5'
+}
+
 // ─── Score bar ────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score: number }) {
@@ -370,7 +378,7 @@ export default function ChatPage() {
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4ade80' }} />
                       <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
-                        {selectedAgent.agent_type} · Haiku 4.5
+                        {selectedAgent.agent_type} · {getModelLabel(selectedAgent.agent_type)}
                       </span>
                       {convMeta && (
                         <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>

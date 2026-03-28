@@ -290,6 +290,28 @@ export function DeployAgentModal({ open, onClose, tenantSector, onDeployed }: De
                   </p>
                 </div>
               </div>
+
+              {/* Sonnet note for complex agents */}
+              {selected && ['research_agent', 'research', 'analyst_agent', 'analyst', 'compliance_agent', 'compliance'].includes(selected.type) && (
+                <div
+                  className="rounded-lg p-4 flex items-start gap-3"
+                  style={{
+                    background: 'rgba(139,92,246,0.05)',
+                    border: '1px solid rgba(139,92,246,0.2)',
+                    borderLeft: '3px solid rgba(139,92,246,0.6)',
+                  }}
+                >
+                  <span className="text-sm shrink-0">✦</span>
+                  <div>
+                    <p className="text-xs font-sans font-medium mb-0.5" style={{ color: '#a78bfa' }}>
+                      Powered by Claude Sonnet 4.6
+                    </p>
+                    <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
+                      This agent uses Claude Sonnet for superior reasoning and deeper analysis. Slightly higher cost per interaction than standard agents.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -2,9 +2,42 @@ import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { sanitiseInput } from '@/lib/sanitise'
 import { callClaude, getModel } from '@/lib/claude'
-import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
+import { buildIntakeSystemPrompt, type ContactProfile } from '@/lib/agents/intake-agent'
+import { buildResearchSystemPrompt }    from '@/lib/agents/research-agent'
+import { buildOperationsSystemPrompt }  from '@/lib/agents/operations-agent'
+import { buildClientSystemPrompt }      from '@/lib/agents/client-agent'
+import { buildAnalystSystemPrompt }     from '@/lib/agents/analyst-agent'
+import { buildComplianceSystemPrompt }  from '@/lib/agents/compliance-agent'
+import { buildContentSystemPrompt }     from '@/lib/agents/content-agent'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
+
+// ─── Agent routing helpers ────────────────────────────────────────────────────
+
+/** Strip optional _agent suffix so 'intake_agent' and 'intake' both match */
+function normaliseType(agentType: string): string {
+  return agentType.replace(/_agent$/, '')
+}
+
+const COMPLEX_AGENTS = ['research', 'analyst', 'compliance']
+
+function getAgentComplexity(agentType: string): 'simple' | 'complex' {
+  return COMPLEX_AGENTS.includes(normaliseType(agentType)) ? 'complex' : 'simple'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSystemPrompt(agentType: string, tenant: any, agent: any, existingProfile?: ContactProfile | null): string {
+  switch (normaliseType(agentType)) {
+    case 'research':   return buildResearchSystemPrompt(tenant, agent)
+    case 'operations': return buildOperationsSystemPrompt(tenant, agent)
+    case 'client':     return buildClientSystemPrompt(tenant, agent)
+    case 'analyst':    return buildAnalystSystemPrompt(tenant, agent)
+    case 'compliance': return buildComplianceSystemPrompt(tenant, agent)
+    case 'content':    return buildContentSystemPrompt(tenant, agent)
+    case 'intake':
+    default:           return buildIntakeSystemPrompt(tenant, agent, existingProfile)
+  }
+}
 
 // GET /api/conversations — filtered list for tenant
 export async function GET(req: NextRequest) {
@@ -166,19 +199,26 @@ export async function POST(req: NextRequest) {
     { role: 'user', content: body.message },
   ]
 
-  // 5. Build intelligent system prompt
+  // 5. Build intelligent system prompt — routed by agent type
   const hasProfile = Object.keys(existingProfile || {}).length > 0
-  const systemPrompt = buildIntakeSystemPrompt(tenant, agent, hasProfile ? existingProfile : null)
+  const systemPrompt = getSystemPrompt(
+    agent.agent_type,
+    tenant,
+    agent,
+    hasProfile ? existingProfile : null,
+  )
 
-  // 6. Call Claude
-  const model = getModel('simple')
+  // 6. Call Claude — complex agents use Sonnet, simple use Haiku
+  const complexity = getAgentComplexity(agent.agent_type)
+  const model = getModel(complexity)
+  const maxTokens = complexity === 'complex' ? 900 : 600
   let claudeResult
   try {
     claudeResult = await callClaude({
       systemPrompt,
       messages,
       model,
-      maxTokens: 600,
+      maxTokens,
       useCache: true,
     })
   } catch (e) {
