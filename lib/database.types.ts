@@ -77,6 +77,7 @@ export type Database = {
           monthly_cost_pkr: number
           monthly_value_pkr: number
           interactions_count: number
+          widget_token: string | null
           created_at: string
           updated_at: string
         }
@@ -93,6 +94,7 @@ export type Database = {
           monthly_cost_pkr?: number
           monthly_value_pkr?: number
           interactions_count?: number
+          widget_token?: string | null
           created_at?: string
           updated_at?: string
         }
