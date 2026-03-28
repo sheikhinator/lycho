@@ -27,3 +27,8 @@ export type { StatCardProps } from './StatCard'
 
 export { AgentCard } from './AgentCard'
 export type { AgentCardProps } from './AgentCard'
+
+export { Logo } from './Logo'
+export type { LogoProps } from './Logo'
+
+export { CustomCursor } from './CustomCursor'

@@ -1,7 +1,13 @@
 import type { Metadata } from 'next'
+import dynamic from 'next/dynamic'
 import { Bebas_Neue, Cormorant_Garamond, DM_Sans, DM_Mono } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import './globals.css'
+
+const CustomCursor = dynamic(
+  () => import('@/components/ui/CustomCursor').then(m => m.CustomCursor),
+  { ssr: false }
+)
 
 const bebasNeue = Bebas_Neue({
   weight: '400',
@@ -33,15 +39,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body
         className={`${bebasNeue.variable} ${cormorant.variable} ${dmSans.variable} ${dmMono.variable} antialiased`}
       >
         <AuthProvider>
+          <CustomCursor />
           {children}
         </AuthProvider>
       </body>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button, Input } from '@/components/ui'
+import { Logo } from '@/components/ui/Logo'
 import { createClientSupabase } from '@/lib/supabase'
 
 export default function LoginPage() {
@@ -41,10 +42,10 @@ export default function LoginPage() {
     <main className="min-h-screen bg-void flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
 
-        {/* Wordmark */}
-        <div className="text-center mb-10">
-          <h1 className="font-bebas text-5xl tracking-[0.2em] text-gold">LYCHO</h1>
-          <p className="font-cormorant text-ivory/50 mt-1 tracking-[0.25em] text-sm uppercase">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10 gap-2">
+          <Logo size="md" />
+          <p className="font-cormorant text-ivory/50 tracking-[0.25em] text-sm uppercase">
             Intelligence. Transmitted.
           </p>
         </div>
