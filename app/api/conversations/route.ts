@@ -172,13 +172,19 @@ export async function POST(req: NextRequest) {
 
   // 6. Call Claude
   const model = getModel('simple')
-  const claudeResult = await callClaude({
-    systemPrompt,
-    messages,
-    model,
-    maxTokens: 600,
-    useCache: true,
-  })
+  let claudeResult
+  try {
+    claudeResult = await callClaude({
+      systemPrompt,
+      messages,
+      model,
+      maxTokens: 600,
+      useCache: true,
+    })
+  } catch (e) {
+    console.error('[conversations POST] Claude API error:', e)
+    return err('AI service temporarily unavailable. Please try again.', 'AI_ERROR', 503)
+  }
 
   // 7. Extract metadata and clean response
   const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult.response)

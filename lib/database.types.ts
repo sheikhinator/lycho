@@ -114,6 +114,7 @@ export type Database = {
           escalated_to: string | null
           feedback: string | null
           tokens_used: number
+          metadata: Record<string, unknown> | null
           created_at: string
         }
         Insert: {
@@ -129,6 +130,7 @@ export type Database = {
           escalated_to?: string | null
           feedback?: string | null
           tokens_used?: number
+          metadata?: Record<string, unknown> | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['conversations']['Insert']>
