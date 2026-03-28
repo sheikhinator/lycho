@@ -12,6 +12,14 @@ import { useToast } from '@/components/providers/ToastProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ConvMetadata {
+  lead_score?: number
+  lead_label?: 'hot' | 'warm' | 'cold'
+  sentiment?: string
+  contact_profile?: { name?: string; email?: string }
+  suggested_next_action?: string
+}
+
 interface Conversation {
   id: string
   agent_id: string
@@ -23,6 +31,7 @@ interface Conversation {
   created_at: string
   resolved_at: string | null
   escalated_to: string | null
+  metadata?: ConvMetadata
 }
 
 interface Message {
@@ -57,6 +66,29 @@ function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   )
+}
+
+// ─── Lead badge ───────────────────────────────────────────────────────────────
+
+function LeadBadge({ label }: { label: 'hot' | 'warm' | 'cold' }) {
+  const map = {
+    hot:  { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444', border: 'rgba(239,68,68,0.3)'  },
+    warm: { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: 'rgba(251,191,36,0.3)' },
+    cold: { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.3)' },
+  }
+  const s = map[label]
+  return (
+    <span
+      className="text-xs px-1.5 py-0.5 rounded font-sans font-semibold uppercase tracking-wider whitespace-nowrap"
+      style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}
+    >
+      {label}
+    </span>
+  )
+}
+
+const SENTIMENT_EMOJI: Record<string, string> = {
+  positive: '😊', excited: '🤩', neutral: '😐', uncertain: '🤔', frustrated: '😤',
 }
 
 // ─── Stat badge ───────────────────────────────────────────────────────────────
@@ -423,7 +455,7 @@ export default function ConversationsPage() {
                   background: '#1c1c1c',
                   borderBottom: '1px solid #2a2a2a',
                   color: '#6b6b6b',
-                  gridTemplateColumns: '48px 1fr 1fr 2fr 100px 64px 100px',
+                  gridTemplateColumns: '40px 1fr 1fr 1.5fr 80px 80px 60px 90px',
                   gap: '12px',
                 }}
               >
@@ -432,7 +464,8 @@ export default function ConversationsPage() {
                 <span>Agent</span>
                 <span>Last Message</span>
                 <span>Status</span>
-                <span>Conf.</span>
+                <span>Lead</span>
+                <span>Mood</span>
                 <span>Date</span>
               </div>
 
@@ -469,21 +502,45 @@ export default function ConversationsPage() {
                     {/* Desktop layout */}
                     <div
                       className="hidden md:grid items-center px-4 py-3 gap-3"
-                      style={{ gridTemplateColumns: '48px 1fr 1fr 2fr 100px 64px 100px' }}
+                      style={{ gridTemplateColumns: '40px 1fr 1fr 1.5fr 80px 80px 60px 90px' }}
                     >
                       <div>{conv.channel && <ChannelIcon channel={conv.channel} size={15} />}</div>
-                      <span className="text-sm font-sans truncate" style={{ color: '#F0EBE1' }}>
-                        {conv.contact_identifier ?? 'Anonymous'}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-sans truncate block" style={{ color: '#F0EBE1' }}>
+                          {conv.metadata?.contact_profile?.name ?? conv.contact_identifier ?? 'Anonymous'}
+                        </span>
+                        {conv.metadata?.contact_profile?.name && conv.contact_identifier && (
+                          <span className="text-xs font-sans truncate block" style={{ color: '#6b6b6b' }}>
+                            {conv.contact_identifier}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm font-sans truncate" style={{ color: '#6b6b6b' }}>
                         {agent?.display_name ?? agent?.agent_type ?? '—'}
                       </span>
-                      <span className="text-xs font-sans truncate" style={{ color: '#6b6b6b' }}>
-                        {lastMessage(conv)}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-sans truncate block" style={{ color: '#6b6b6b' }}>
+                          {lastMessage(conv)}
+                        </span>
+                        {conv.metadata?.suggested_next_action && conv.metadata.suggested_next_action !== 'continue' && (
+                          <span
+                            className="text-xs font-sans truncate block mt-0.5"
+                            style={{ color: '#C9A84C', opacity: 0.8 }}
+                          >
+                            → {conv.metadata.suggested_next_action.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
                       <StatusBadge status={conv.status} />
-                      <span className="text-sm font-sans" style={{ color: conv.confidence_score && conv.confidence_score >= 0.7 ? '#4ade80' : '#fbbf24' }}>
-                        {conv.confidence_score !== null ? `${(conv.confidence_score * 100).toFixed(0)}%` : '—'}
+                      <div>
+                        {conv.metadata?.lead_label ? (
+                          <LeadBadge label={conv.metadata.lead_label} />
+                        ) : (
+                          <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>—</span>
+                        )}
+                      </div>
+                      <span className="text-sm" title={conv.metadata?.sentiment}>
+                        {SENTIMENT_EMOJI[conv.metadata?.sentiment ?? ''] ?? '—'}
                       </span>
                       <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
                         {new Date(conv.created_at).toLocaleDateString()}

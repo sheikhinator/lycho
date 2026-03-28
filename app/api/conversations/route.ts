@@ -1,9 +1,12 @@
 import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { sanitiseInput } from '@/lib/sanitise'
+import { callClaude, getModel } from '@/lib/claude'
+import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
+import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
+import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 
 // GET /api/conversations — filtered list for tenant
-// Query params: agent_id, status, channel, search, page (1-based), limit
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
@@ -36,11 +39,10 @@ export async function GET(req: NextRequest) {
   const { data, error, count } = await query
 
   if (error) return err(error.message, 'DB_ERROR', 500)
-
   return ok({ conversations: data, total: count ?? 0, page, limit })
 }
 
-// POST /api/conversations — create a new conversation (Phase 2 stub)
+// POST /api/conversations — send a message, get Claude response
 export async function POST(req: NextRequest) {
   const rl = await rateGuard(req)
   if (rl) return rl
@@ -68,66 +70,223 @@ export async function POST(req: NextRequest) {
   if (!body.contact_identifier) return err('contact_identifier is required', 'VALIDATION_ERROR', 400)
   if (!body.message)            return err('message is required', 'VALIDATION_ERROR', 400)
 
+  // 1. Sanitise inputs
   const siContact = sanitiseInput(body.contact_identifier)
   if (!siContact.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
   body.contact_identifier = siContact.cleaned
 
   const siMessage = sanitiseInput(body.message)
-  if (!siMessage.safe) return err('Invalid input detected', 'INVALID_INPUT', 400)
+  if (!siMessage.safe) {
+    return ok({
+      response: "I'm sorry, I couldn't process that message. Please try rephrasing.",
+      confidence: 1.0,
+      escalated: false,
+    })
+  }
   body.message = siMessage.cleaned
 
-  // Verify agent belongs to tenant
+  // 2. Get agent and tenant
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, status')
+    .select('*')
     .eq('id', body.agent_id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (agentError || !agent) return err('Agent not found', 'NOT_FOUND', 404)
 
-  // Create conversation with initial user message
-  const { data: conversation, error: insertError } = await supabase
-    .from('conversations')
-    .insert({
-      tenant_id: tenantId,
-      agent_id: body.agent_id,
-      channel: body.channel,
-      contact_identifier: body.contact_identifier,
-      status: 'open',
-      messages: [
-        {
-          role: 'user',
-          content: body.message,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    })
-    .select()
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('*')
+    .eq('id', tenantId)
     .single()
 
-  if (insertError) return err(insertError.message, 'DB_ERROR', 500)
+  if (!tenant) return err('Tenant not found', 'NOT_FOUND', 404)
 
+  // 3. Get or create conversation
+  let conversation: Record<string, unknown> | null = null
+
+  const { data: existing } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('agent_id', body.agent_id)
+    .eq('contact_identifier', body.contact_identifier)
+    .eq('status', 'open')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // Get previous closed conversations to build existing profile
+  const { data: previousConvos } = await supabase
+    .from('conversations')
+    .select('messages, metadata')
+    .eq('agent_id', body.agent_id)
+    .eq('contact_identifier', body.contact_identifier)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingProfile = (previousConvos ?? []).reduce((profile: any, convo: any) => {
+    if (convo.metadata?.contact_profile) {
+      return { ...profile, ...convo.metadata.contact_profile }
+    }
+    return profile
+  }, {})
+
+  if (existing) {
+    conversation = existing
+  } else {
+    const { data: newConvo, error: createError } = await supabase
+      .from('conversations')
+      .insert({
+        tenant_id: tenantId,
+        agent_id: body.agent_id,
+        channel: body.channel,
+        contact_identifier: body.contact_identifier,
+        status: 'open',
+        messages: [],
+        metadata: { contact_profile: existingProfile || {}, lead_score: 50 },
+      })
+      .select()
+      .single()
+
+    if (createError) return err(createError.message, 'DB_ERROR', 500)
+    conversation = newConvo
+  }
+
+  // 4. Build messages array
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const priorMessages: { role: 'user' | 'assistant'; content: string }[] = ((conversation!.messages as any[]) ?? []).map((m: any) => ({
+    role: m.role as 'user' | 'assistant',
+    content: m.content as string,
+  }))
+
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+    ...priorMessages,
+    { role: 'user', content: body.message },
+  ]
+
+  // 5. Build intelligent system prompt
+  const hasProfile = Object.keys(existingProfile || {}).length > 0
+  const systemPrompt = buildIntakeSystemPrompt(tenant, agent, hasProfile ? existingProfile : null)
+
+  // 6. Call Claude
+  const model = getModel('simple')
+  const claudeResult = await callClaude({
+    systemPrompt,
+    messages,
+    model,
+    maxTokens: 600,
+    useCache: true,
+  })
+
+  // 7. Extract metadata and clean response
+  const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult.response)
+
+  // 8. Update contact profile
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentProfile = (conversation!.metadata as any)?.contact_profile || {}
+  const updatedProfile = { ...currentProfile, ...(metadata?.profile_update || {}) }
+
+  // 9. Calculate lead score
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leadScore = calculateLeadScore(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (conversation!.metadata as any)?.lead_score || 50,
+    metadata,
+    messages.length,
+  )
+
+  // 10. Calculate confidence
+  const confidence = calculateConfidence(cleanResponse, body.message)
+
+  // 11. Update conversation in DB
+  const updatedMessages = [
+    ...messages,
+    { role: 'assistant' as const, content: cleanResponse, timestamp: new Date().toISOString() },
+  ]
+
+  await supabase
+    .from('conversations')
+    .update({
+      messages: updatedMessages,
+      confidence_score: confidence,
+      escalated_to: escalated ? 'human' : null,
+      status: escalated ? 'escalated' : 'open',
+      tokens_used: ((conversation!.tokens_used as number) || 0) + claudeResult.tokensUsed,
+      metadata: {
+        contact_profile: updatedProfile,
+        lead_score: leadScore,
+        lead_label: getLeadLabel(leadScore),
+        sentiment: metadata?.sentiment || 'neutral',
+        intent: metadata?.intent || 'enquiry',
+        suggested_next_action: metadata?.suggested_next_action || 'continue',
+        last_metadata: metadata,
+      },
+    })
+    .eq('id', conversation!.id as string)
+
+  // 12. Update agent interaction count
+  await supabase
+    .from('agents')
+    .update({
+      interactions_count: ((agent.interactions_count as number) || 0) + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', body.agent_id)
+
+  // 13. Hot lead audit log
+  if (leadScore >= 85) {
+    await auditLog(supabase, {
+      tenantId,
+      actorId: userId,
+      action: 'lead.hot_detected',
+      resourceType: 'conversation',
+      resourceId: conversation!.id as string,
+      metadata: { lead_score: leadScore, contact_profile: updatedProfile },
+    })
+  }
+
+  // 14. Message audit log
   await auditLog(supabase, {
     tenantId,
     actorId: userId,
-    action: 'conversation.created',
+    action: 'conversation.message',
     resourceType: 'conversation',
-    resourceId: conversation.id,
-    metadata: { agent_id: body.agent_id, channel: body.channel },
+    resourceId: conversation!.id as string,
+    metadata: {
+      model: claudeResult.model,
+      tokens: claudeResult.tokensUsed,
+      cost_pkr: claudeResult.estimatedCostPkr,
+      confidence,
+      escalated,
+      lead_score: leadScore,
+      sentiment: metadata?.sentiment,
+    },
   })
 
-  // Phase 2 stub — real Claude API response wired in Phase 3
-  return ok(
-    {
-      conversation,
-      agent_response: {
-        role: 'assistant',
-        content: 'Thank you for reaching out. An agent will respond shortly.',
-        placeholder: true,
-      },
-    },
-    'Conversation created',
-    201,
-  )
+  return ok({
+    conversation_id: conversation!.id,
+    response: cleanResponse,
+    confidence,
+    escalated,
+    model_used: claudeResult.model,
+    tokens_used: claudeResult.tokensUsed,
+    cost_pkr: claudeResult.estimatedCostPkr,
+    lead_score: leadScore,
+    lead_label: getLeadLabel(leadScore),
+    sentiment: metadata?.sentiment || 'neutral',
+    contact_profile: updatedProfile,
+    suggested_next_action: metadata?.suggested_next_action || 'continue',
+  })
+}
+
+function calculateConfidence(response: string, userMessage: string): number {
+  void userMessage
+  const lowSignals = [
+    "i don't know", "i'm not sure", "i cannot",
+    "i don't have", "unclear", "not certain",
+    "unfortunately", "i'm unable",
+  ]
+  return lowSignals.some(s => response.toLowerCase().includes(s)) ? 0.62 : 0.93
 }
