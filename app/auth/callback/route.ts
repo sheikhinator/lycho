@@ -29,6 +29,31 @@ export async function GET(request: NextRequest) {
     )
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Check if the user needs to complete onboarding
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('tenant_id')
+            .eq('id', user.id)
+            .single()
+
+          if (userRow?.tenant_id) {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('onboarding_completed')
+              .eq('id', userRow.tenant_id)
+              .single()
+
+            if (tenant && tenant.onboarding_completed === false) {
+              return NextResponse.redirect(`${origin}/onboarding`)
+            }
+          }
+        }
+      } catch {
+        // If check fails, proceed normally
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

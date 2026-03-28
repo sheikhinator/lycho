@@ -15,6 +15,8 @@ export type Database = {
           currency: string
           health_score: number
           churn_risk_score: number
+          onboarding_step: number
+          onboarding_completed: boolean
           created_at: string
           deleted_at: string | null
         }
@@ -31,6 +33,8 @@ export type Database = {
           currency?: string
           health_score?: number
           churn_risk_score?: number
+          onboarding_step?: number
+          onboarding_completed?: boolean
           created_at?: string
           deleted_at?: string | null
         }
