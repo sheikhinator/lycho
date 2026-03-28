@@ -261,7 +261,7 @@ export default function Home() {
         <section
           ref={heroRef}
           className="relative flex flex-col items-center justify-center text-center px-5 overflow-hidden"
-          style={{ minHeight: '100vh', paddingTop: '80px' }}
+          style={{ minHeight: '100vh', paddingTop: '80px', paddingBottom: '80px' }}
         >
           {/* Animated background */}
           <div
@@ -279,7 +279,7 @@ export default function Home() {
             }}
           />
 
-          <div className="relative z-10 max-w-4xl mx-auto">
+          <div className="relative z-10 max-w-4xl mx-auto w-full flex flex-col items-center">
             <div className="mb-8">
               <Logo size="lg" />
             </div>
