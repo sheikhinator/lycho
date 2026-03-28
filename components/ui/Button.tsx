@@ -16,9 +16,9 @@ const variantClasses: Record<Variant, string> = {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-xs',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-3 text-base',
+  sm: 'px-3 py-1.5',
+  md: 'px-4 py-2',
+  lg: 'px-6 py-3',
 }
 
 export function Button({
@@ -30,12 +30,13 @@ export function Button({
   return (
     <button
       className={[
-        'inline-flex items-center justify-center rounded font-medium transition-colors duration-150',
-        'disabled:opacity-40 disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center rounded transition-colors duration-150',
+        'font-sans font-medium disabled:opacity-40 disabled:cursor-not-allowed',
         variantClasses[variant],
         sizeClasses[size],
         className,
       ].join(' ')}
+      style={{ fontSize: '14px', letterSpacing: '0.3px', ...props.style }}
       {...props}
     />
   )
