@@ -11,6 +11,8 @@ import { buildComplianceSystemPrompt }  from '@/lib/agents/compliance-agent'
 import { buildContentSystemPrompt }     from '@/lib/agents/content-agent'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
+import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
+import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
 
 // ─── Agent routing helpers ────────────────────────────────────────────────────
 
@@ -199,14 +201,23 @@ export async function POST(req: NextRequest) {
     { role: 'user', content: body.message },
   ]
 
-  // 5. Build intelligent system prompt — routed by agent type
+  // 5a. Emotional intelligence
+  const emotion = analyseEmotion(body.message, priorMessages)
+
+  // 5b. Contact memory
+  const memory        = await getContactMemory(tenantId, body.contact_identifier, supabase)
+  const memoryContext = buildMemoryContext(memory)
+
+  // 5c. Build intelligent system prompt — routed by agent type
   const hasProfile = Object.keys(existingProfile || {}).length > 0
-  const systemPrompt = getSystemPrompt(
-    agent.agent_type,
-    tenant,
-    agent,
-    hasProfile ? existingProfile : null,
-  )
+  let extraContext = ''
+  if (memoryContext) extraContext += memoryContext + '\n\n'
+  if (emotion.opening_acknowledgement) {
+    extraContext += `EMOTIONAL CONTEXT: Customer appears ${emotion.state} (intensity: ${emotion.intensity.toFixed(1)}). Tone: ${emotion.recommended_tone}. Start with: "${emotion.opening_acknowledgement}"\n\n`
+  }
+
+  const basePrompt = getSystemPrompt(agent.agent_type, tenant, agent, hasProfile ? existingProfile : null)
+  const systemPrompt = extraContext ? `${basePrompt}\n\n${extraContext}` : basePrompt
 
   // 6. Call Claude — complex agents use Sonnet, simple use Haiku
   const complexity = getAgentComplexity(agent.agent_type)
@@ -228,6 +239,25 @@ export async function POST(req: NextRequest) {
 
   // 7. Extract metadata and clean response
   const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult.response)
+
+  // 7b. Update contact memory graph (non-fatal)
+  await updateContactMemory(
+    tenantId,
+    body.contact_identifier,
+    {
+      profile:         metadata?.profile_update ?? {},
+      total_value_pkr: metadata?.transaction_value ?? 0,
+    },
+    {
+      timestamp:  new Date().toISOString(),
+      type:       'interaction',
+      summary:    body.message.slice(0, 120),
+      sentiment:  metadata?.sentiment ?? emotion.state,
+      agent_type: agent.agent_type,
+      channel:    body.channel,
+    },
+    supabase,
+  )
 
   // 8. Update contact profile
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -261,13 +291,15 @@ export async function POST(req: NextRequest) {
       status: escalated ? 'escalated' : 'open',
       tokens_used: ((conversation!.tokens_used as number) || 0) + claudeResult.tokensUsed,
       metadata: {
-        contact_profile: updatedProfile,
-        lead_score: leadScore,
-        lead_label: getLeadLabel(leadScore),
-        sentiment: metadata?.sentiment || 'neutral',
-        intent: metadata?.intent || 'enquiry',
+        contact_profile:       updatedProfile,
+        lead_score:            leadScore,
+        lead_label:            getLeadLabel(leadScore),
+        sentiment:             metadata?.sentiment || 'neutral',
+        emotional_state:       emotion.state,
+        emotional_intensity:   emotion.intensity,
+        intent:                metadata?.intent || 'enquiry',
         suggested_next_action: metadata?.suggested_next_action || 'continue',
-        last_metadata: metadata,
+        last_metadata:         metadata,
       },
     })
     .eq('id', conversation!.id as string)
@@ -312,18 +344,25 @@ export async function POST(req: NextRequest) {
   })
 
   return ok({
-    conversation_id: conversation!.id,
-    response: cleanResponse,
+    conversation_id:       conversation!.id,
+    response:              cleanResponse,
     confidence,
     escalated,
-    model_used: claudeResult.model,
-    tokens_used: claudeResult.tokensUsed,
-    cost_pkr: claudeResult.estimatedCostPkr,
-    lead_score: leadScore,
-    lead_label: getLeadLabel(leadScore),
-    sentiment: metadata?.sentiment || 'neutral',
-    contact_profile: updatedProfile,
+    model_used:            claudeResult.model,
+    tokens_used:           claudeResult.tokensUsed,
+    cost_pkr:              claudeResult.estimatedCostPkr,
+    lead_score:            leadScore,
+    lead_label:            getLeadLabel(leadScore),
+    sentiment:             metadata?.sentiment || 'neutral',
+    emotional_state:       emotion.state,
+    emotional_intensity:   emotion.intensity,
+    contact_profile:       updatedProfile,
     suggested_next_action: metadata?.suggested_next_action || 'continue',
+    memory: memory ? {
+      relationship_score:  memory.relationship_score,
+      total_interactions:  memory.total_interactions,
+      total_value_pkr:     memory.total_value_pkr,
+    } : null,
   })
 }
 

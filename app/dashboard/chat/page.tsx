@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Send, ChevronRight, User, Zap, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Send, ChevronRight, User, Zap, AlertTriangle, TrendingUp, Brain } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { useToast } from '@/components/providers/ToastProvider'
+import { EMOTION_EMOJI } from '@/lib/agents/emotional-intelligence'
+import { getAgentCapabilities } from '@/lib/agents/capability-manifest'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ interface ChatMessage {
   cost_pkr?: number
   model_used?: string
   escalated?: boolean
+  emotional_state?: string
+  emotional_intensity?: number
 }
 
 interface ContactProfile {
@@ -42,8 +46,11 @@ interface ConversationMeta {
   lead_score: number
   lead_label: 'hot' | 'warm' | 'cold'
   sentiment: string
+  emotional_state?: string
+  emotional_intensity?: number
   contact_profile: ContactProfile
   suggested_next_action: string
+  memory?: { relationship_score: number; total_interactions: number; total_value_pkr: number } | null
 }
 
 // ─── Lead badge ───────────────────────────────────────────────────────────────
@@ -181,8 +188,11 @@ export default function ChatPage() {
           lead_score:            meta.lead_score ?? 50,
           lead_label:            meta.lead_label ?? 'warm',
           sentiment:             meta.sentiment ?? 'neutral',
+          emotional_state:       meta.emotional_state ?? undefined,
+          emotional_intensity:   meta.emotional_intensity ?? undefined,
           contact_profile:       meta.contact_profile ?? {},
           suggested_next_action: meta.suggested_next_action ?? 'continue',
+          memory:                null,
         })
       }
     } catch {
@@ -260,14 +270,16 @@ export default function ChatPage() {
       const d = json.data
 
       const agentMsg: ChatMessage = {
-        role:       'assistant',
-        content:    d.response,
-        timestamp:  new Date().toISOString(),
-        confidence: d.confidence,
-        lead_score: d.lead_score,
-        cost_pkr:   d.cost_pkr,
-        model_used: d.model_used,
-        escalated:  d.escalated,
+        role:               'assistant',
+        content:            d.response,
+        timestamp:          new Date().toISOString(),
+        confidence:         d.confidence,
+        lead_score:         d.lead_score,
+        cost_pkr:           d.cost_pkr,
+        model_used:         d.model_used,
+        escalated:          d.escalated,
+        emotional_state:    d.emotional_state,
+        emotional_intensity: d.emotional_intensity,
       }
 
       setMessages(prev => [...prev, agentMsg])
@@ -276,8 +288,11 @@ export default function ChatPage() {
         lead_score:             d.lead_score,
         lead_label:             d.lead_label,
         sentiment:              d.sentiment,
+        emotional_state:        d.emotional_state,
+        emotional_intensity:    d.emotional_intensity,
         contact_profile:        d.contact_profile ?? {},
         suggested_next_action:  d.suggested_next_action,
+        memory:                 d.memory ?? null,
       })
     } catch {
       toast('Failed to send message', 'error')
@@ -485,6 +500,15 @@ export default function ChatPage() {
                             <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            {!isAgent && msg.emotional_state && msg.emotional_state !== 'neutral' && (
+                              <span
+                                className="text-xs font-sans px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(107,107,107,0.1)', color: '#F0EBE1' }}
+                                title={`Detected emotion: ${msg.emotional_state}`}
+                              >
+                                {EMOTION_EMOJI[msg.emotional_state as keyof typeof EMOTION_EMOJI] ?? '😐'} {msg.emotional_state}
+                              </span>
+                            )}
                             {isAgent && msg.confidence !== undefined && (
                               <span
                                 className="text-xs font-sans px-1.5 py-0.5 rounded"
@@ -651,9 +675,105 @@ export default function ChatPage() {
                             </div>
                           </div>
                         )}
+
+                        {/* Emotional state */}
+                        {convMeta.emotional_state && convMeta.emotional_state !== 'neutral' && (
+                          <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: '16px' }}>
+                            <p className="text-xs font-sans uppercase tracking-widest mb-2" style={{ color: '#6b6b6b' }}>
+                              Emotional State
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">
+                                {EMOTION_EMOJI[convMeta.emotional_state as keyof typeof EMOTION_EMOJI] ?? '😐'}
+                              </span>
+                              <div>
+                                <p className="text-xs font-sans font-medium capitalize" style={{ color: '#F0EBE1' }}>
+                                  {convMeta.emotional_state}
+                                </p>
+                                {convMeta.emotional_intensity !== undefined && (
+                                  <div className="mt-1 h-1 rounded-full w-16" style={{ background: '#2a2a2a' }}>
+                                    <div
+                                      className="h-1 rounded-full"
+                                      style={{
+                                        width: `${convMeta.emotional_intensity * 100}%`,
+                                        background: convMeta.emotional_intensity > 0.7 ? '#ef4444' : convMeta.emotional_intensity > 0.4 ? '#fbbf24' : '#4ade80',
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Memory graph */}
+                        {convMeta.memory && (
+                          <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: '16px' }}>
+                            <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#6b6b6b' }}>
+                              Memory Graph
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Relationship</span>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="h-1 w-12 rounded-full" style={{ background: '#2a2a2a' }}>
+                                    <div className="h-1 rounded-full" style={{ width: `${convMeta.memory.relationship_score}%`, background: '#C9A84C' }} />
+                                  </div>
+                                  <span className="text-xs font-sans" style={{ color: '#C9A84C' }}>{convMeta.memory.relationship_score}</span>
+                                </div>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Interactions</span>
+                                <span className="text-xs font-sans" style={{ color: '#F0EBE1' }}>{convMeta.memory.total_interactions}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Total Value</span>
+                                <span className="text-xs font-sans" style={{ color: '#F0EBE1' }}>PKR {convMeta.memory.total_value_pkr.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
+
+                  {/* Agent capabilities */}
+                  {selectedAgent && (() => {
+                    const cap = getAgentCapabilities(selectedAgent.agent_type)
+                    if (!cap) return null
+                    return (
+                      <div className="px-4 py-4 shrink-0" style={{ borderTop: '1px solid #2a2a2a' }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Brain size={13} style={{ color: '#6b6b6b' }} />
+                          <p className="text-xs font-sans uppercase tracking-widest" style={{ color: '#6b6b6b' }}>
+                            Capabilities
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          {([
+                            { label: 'Escalate',     val: cap.can_escalate },
+                            { label: 'Book Appts',   val: cap.can_book_appointments },
+                            { label: 'Send Files',   val: cap.can_send_files },
+                          ] as { label: string; val: boolean }[]).map(({ label, val }) => (
+                            <div key={label} className="flex items-center justify-between">
+                              <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>{label}</span>
+                              <span className="text-xs font-sans" style={{ color: val ? '#4ade80' : '#6b6b6b' }}>
+                                {val ? '✓' : '—'}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Channels</span>
+                            <span className="text-xs font-sans" style={{ color: '#F0EBE1' }}>{cap.supported_channels.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Avg Response</span>
+                            <span className="text-xs font-sans" style={{ color: '#F0EBE1' }}>{(cap.avg_response_ms / 1000).toFixed(1)}s</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>

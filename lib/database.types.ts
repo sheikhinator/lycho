@@ -261,6 +261,103 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['waitlist']['Insert']>
         Relationships: []
       }
+
+      channel_connections: {
+        Row: {
+          id: string
+          tenant_id: string
+          agent_id: string | null
+          channel_type: string
+          channel_identifier: string | null
+          display_name: string | null
+          status: string
+          credentials: Record<string, unknown> | null
+          config: Record<string, unknown> | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          agent_id?: string | null
+          channel_type: string
+          channel_identifier?: string | null
+          display_name?: string | null
+          status?: string
+          credentials?: Record<string, unknown> | null
+          config?: Record<string, unknown> | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['channel_connections']['Insert']>
+        Relationships: []
+      }
+
+      automations: {
+        Row: {
+          id: string
+          tenant_id: string
+          agent_id: string | null
+          name: string
+          trigger_type: string
+          trigger_config: Record<string, unknown> | null
+          action_type: string
+          action_config: Record<string, unknown> | null
+          status: string
+          run_count: number
+          last_run_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          agent_id?: string | null
+          name: string
+          trigger_type: string
+          trigger_config?: Record<string, unknown> | null
+          action_type: string
+          action_config?: Record<string, unknown> | null
+          status?: string
+          run_count?: number
+          last_run_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['automations']['Insert']>
+        Relationships: []
+      }
+
+      contact_memory: {
+        Row: {
+          id: string
+          tenant_id: string
+          contact_identifier: string
+          contact_name: string | null
+          profile: Record<string, unknown>
+          memory_nodes: Record<string, unknown>[]
+          relationship_score: number
+          total_interactions: number
+          total_value_pkr: number
+          first_seen_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          contact_identifier: string
+          contact_name?: string | null
+          profile?: Record<string, unknown>
+          memory_nodes?: Record<string, unknown>[]
+          relationship_score?: number
+          total_interactions?: number
+          total_value_pkr?: number
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['contact_memory']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -270,11 +367,14 @@ export type Database = {
 }
 
 // Convenience row types
-export type Tenant        = Database['public']['Tables']['tenants']['Row']
-export type User          = Database['public']['Tables']['users']['Row']
-export type Agent         = Database['public']['Tables']['agents']['Row']
-export type Conversation  = Database['public']['Tables']['conversations']['Row']
-export type Subscription  = Database['public']['Tables']['subscriptions']['Row']
-export type AgentVersion  = Database['public']['Tables']['agent_versions']['Row']
-export type AuditLog      = Database['public']['Tables']['audit_log']['Row']
-export type WaitlistEntry = Database['public']['Tables']['waitlist']['Row']
+export type Tenant             = Database['public']['Tables']['tenants']['Row']
+export type User               = Database['public']['Tables']['users']['Row']
+export type Agent              = Database['public']['Tables']['agents']['Row']
+export type Conversation       = Database['public']['Tables']['conversations']['Row']
+export type Subscription       = Database['public']['Tables']['subscriptions']['Row']
+export type AgentVersion       = Database['public']['Tables']['agent_versions']['Row']
+export type AuditLog           = Database['public']['Tables']['audit_log']['Row']
+export type WaitlistEntry      = Database['public']['Tables']['waitlist']['Row']
+export type ChannelConnection  = Database['public']['Tables']['channel_connections']['Row']
+export type Automation         = Database['public']['Tables']['automations']['Row']
+export type ContactMemory      = Database['public']['Tables']['contact_memory']['Row']

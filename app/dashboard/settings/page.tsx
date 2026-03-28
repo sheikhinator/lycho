@@ -4,16 +4,18 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User, Users, Puzzle, Bell,
-  UserPlus, Trash2, ChevronDown,
+  UserPlus, Trash2, ChevronDown, Search,
 } from 'lucide-react'
-import { FaWhatsapp, FaSlack } from 'react-icons/fa'
-import { MdEmail, MdCalendarToday } from 'react-icons/md'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/providers/ToastProvider'
 import { createClientSupabase } from '@/lib/supabase'
+import {
+  INTEGRATIONS_CATALOGUE, INTEGRATION_CATEGORIES,
+  type IntegrationCategory,
+} from '@/lib/integrations/integrations-catalogue'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,14 +61,6 @@ const CURRENCIES = ['PKR', 'USD', 'AED', 'SAR', 'GBP', 'EUR', 'INR', 'CAD', 'AUD
 
 const ROLES = ['admin', 'member', 'viewer']
 
-const INTEGRATIONS = [
-  { id: 'whatsapp', name: 'WhatsApp Business', desc: 'Connect your WhatsApp number', icon: <FaWhatsapp size={22} style={{ color: '#25D366' }} />, color: '#25D366' },
-  { id: 'gmail',    name: 'Gmail',              desc: 'Connect your Gmail account',   icon: <MdEmail    size={22} style={{ color: '#C9A84C' }} />, color: '#C9A84C' },
-  { id: 'gcal',     name: 'Google Calendar',    desc: 'Sync your calendar',           icon: <MdCalendarToday size={22} style={{ color: '#3498db' }} />, color: '#3498db' },
-  { id: 'slack',    name: 'Slack',              desc: 'Get notifications in Slack',   icon: <FaSlack    size={22} style={{ color: '#9b59b6' }} />, color: '#9b59b6' },
-  { id: 'hubspot',  name: 'HubSpot',            desc: 'Sync your CRM',               icon: <span style={{ color: '#FF7A59', fontWeight: 700, fontSize: '18px' }}>HS</span>, color: '#FF7A59' },
-  { id: 'shopify',  name: 'Shopify',            desc: 'Connect your store',           icon: <span style={{ color: '#96BF48', fontWeight: 700, fontSize: '18px' }}>S</span>, color: '#96BF48' },
-]
 
 const DEFAULT_NOTIF = {
   new_conversations: true,
@@ -418,37 +412,142 @@ function TeamTab() {
 
 function IntegrationsTab() {
   const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState<IntegrationCategory | 'all'>('all')
+
+  const filtered = INTEGRATIONS_CATALOGUE.filter(intg => {
+    const matchesCategory = activeCategory === 'all' || intg.category === activeCategory
+    const q = search.toLowerCase()
+    const matchesSearch = !q ||
+      intg.name.toLowerCase().includes(q) ||
+      intg.description.toLowerCase().includes(q) ||
+      intg.tags.some(t => t.includes(q))
+    return matchesCategory && matchesSearch
+  })
+
+  const liveCount = INTEGRATIONS_CATALOGUE.filter(i => i.status === 'live').length
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {INTEGRATIONS.map(intg => (
-        <div key={intg.id} className="rounded-lg p-5 flex flex-col gap-3" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
-          <div className="flex items-start justify-between">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ background: `${intg.color}14`, border: `1px solid ${intg.color}30` }}
-            >
-              {intg.icon}
-            </div>
-            <span
-              className="text-xs font-sans px-2 py-0.5 rounded"
-              style={{ background: 'rgba(107,107,107,0.1)', color: '#6b6b6b', border: '1px solid rgba(107,107,107,0.2)' }}
-            >
-              Not Connected
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>{intg.name}</p>
-            <p className="text-xs font-sans mt-0.5" style={{ color: '#6b6b6b' }}>{intg.desc}</p>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => toast('Integration coming in the next update', 'info')}
-          >
-            Connect
-          </Button>
+    <div className="space-y-6">
+      {/* Header stats */}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex gap-4 text-xs font-sans" style={{ color: '#6b6b6b' }}>
+          <span><span style={{ color: '#C9A84C' }}>{liveCount}</span> live</span>
+          <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length - liveCount}</span> coming soon</span>
+          <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length}</span> total</span>
         </div>
-      ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#6b6b6b' }} />
+        <input
+          type="text"
+          placeholder="Search integrations…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-3 py-2.5 rounded text-sm font-sans outline-none transition-all"
+          style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', color: '#F0EBE1' }}
+          onFocus={e => (e.currentTarget.style.borderColor = '#C9A84C')}
+          onBlur={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
+        />
+      </div>
+
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setActiveCategory('all')}
+          className="px-3 py-1.5 rounded text-xs font-sans transition-colors"
+          style={{
+            background: activeCategory === 'all' ? 'rgba(201,168,76,0.1)' : '#1c1c1c',
+            color: activeCategory === 'all' ? '#C9A84C' : '#6b6b6b',
+            border: activeCategory === 'all' ? '1px solid rgba(201,168,76,0.25)' : '1px solid #2a2a2a',
+          }}
+        >
+          All
+        </button>
+        {INTEGRATION_CATEGORIES.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className="px-3 py-1.5 rounded text-xs font-sans transition-colors"
+            style={{
+              background: activeCategory === cat.id ? 'rgba(201,168,76,0.1)' : '#1c1c1c',
+              color: activeCategory === cat.id ? '#C9A84C' : '#6b6b6b',
+              border: activeCategory === cat.id ? '1px solid rgba(201,168,76,0.25)' : '1px solid #2a2a2a',
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Integration cards */}
+      {filtered.length === 0 ? (
+        <div className="rounded-lg p-12 text-center" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
+          <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>No integrations found for &quot;{search}&quot;</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(intg => {
+            const isLive = intg.status === 'live'
+            return (
+              <div
+                key={intg.id}
+                className="rounded-lg p-5 flex flex-col gap-3"
+                style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}
+              >
+                {/* Header row */}
+                <div className="flex items-start justify-between">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                    style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.15)' }}
+                  >
+                    {intg.logo}
+                  </div>
+                  <span
+                    className="text-xs font-sans px-2 py-0.5 rounded"
+                    style={
+                      isLive
+                        ? { background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }
+                        : { background: 'rgba(107,107,107,0.08)', color: '#6b6b6b', border: '1px solid rgba(107,107,107,0.2)' }
+                    }
+                  >
+                    {isLive ? 'Live' : 'Coming Soon'}
+                  </span>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1">
+                  <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>{intg.name}</p>
+                  <p className="text-xs font-sans mt-1 leading-relaxed" style={{ color: '#6b6b6b' }}>
+                    {intg.description}
+                  </p>
+                </div>
+
+                {/* Action button */}
+                {isLive ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => toast('Navigate to agent settings to connect this channel', 'info')}
+                  >
+                    Connect
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toast(`We'll notify you when ${intg.name} goes live`, 'success')}
+                  >
+                    Notify Me
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
