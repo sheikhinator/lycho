@@ -224,7 +224,7 @@ export default async function DashboardPage() {
               <strong>{trialDays} day{trialDays !== 1 ? 's' : ''} remaining.</strong>
               {' '}Upgrade to keep your agents running.
             </p>
-            <Button variant="primary" size="sm">Upgrade</Button>
+            <Button variant="secondary" size="sm">Upgrade</Button>
           </div>
         )}
 
@@ -281,21 +281,21 @@ export default async function DashboardPage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <AgentDashCard
-                number="AGENT 01"
+                number="INTAKE AGENT"
                 name="Intake"
                 description="The front door of your business. Receives every message across every channel. Responds instantly. Routes intelligently."
                 channels={['whatsapp', 'email', 'web']}
                 tag="All Sectors"
               />
               <AgentDashCard
-                number="AGENT 02"
+                number="RESEARCH AGENT"
                 name="Research"
                 description="Your intelligence engine. Monitors competitors, regulations, and markets in real time. Delivers daily briefs."
                 channels={['web']}
                 tag="Finance · Legal"
               />
               <AgentDashCard
-                number="AGENT 03"
+                number="OPERATIONS AGENT"
                 name="Operations"
                 description="The workhorse. Automates every repeatable workflow end-to-end. Scheduling, reporting, follow-ups — handled autonomously."
                 channels={['email']}
