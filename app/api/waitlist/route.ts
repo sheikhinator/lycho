@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabase } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase'
 import { ok, err, rateGuard, AUTH_LIMITS } from '@/lib/api'
 import { sanitiseInput } from '@/lib/sanitise'
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     body.name = s.cleaned
   }
 
-  const supabase = createServerSupabase()
+  const supabase = createAdminClient()
 
   // Check for duplicate
   const { data: existing } = await supabase
