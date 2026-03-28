@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err } from '@/lib/api'
 
 // GET /api/conversations — filtered list for tenant
-// Query params: agent_id, status, channel, page (1-based), limit
+// Query params: agent_id, status, channel, search, page (1-based), limit
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const agentId  = searchParams.get('agent_id')
   const status   = searchParams.get('status')
   const channel  = searchParams.get('channel')
+  const search   = searchParams.get('search')
   const page     = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit    = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
   const from     = (page - 1) * limit
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
   if (agentId) query = query.eq('agent_id', agentId)
   if (status)  query = query.eq('status', status)
   if (channel) query = query.eq('channel', channel)
+  if (search)  query = query.ilike('contact_identifier', `%${search}%`)
 
   const { data, error, count } = await query
 

@@ -11,12 +11,12 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { useSidebar } from '@/components/providers/SidebarContext'
 
 const NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard',        routed: true  },
-  { icon: Bot,             label: 'Agents',        href: '/dashboard/agents', routed: true  },
-  { icon: MessageSquare,   label: 'Conversations', href: '#',                 routed: false },
-  { icon: Store,           label: 'Marketplace',   href: '#',                 routed: false },
-  { icon: CreditCard,      label: 'Billing',       href: '#',                 routed: false },
-  { icon: Settings,        label: 'Settings',      href: '#',                 routed: false },
+  { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard',                  routed: true  },
+  { icon: Bot,             label: 'Agents',        href: '/dashboard/agents',           routed: true  },
+  { icon: MessageSquare,   label: 'Conversations', href: '/dashboard/conversations',    routed: true  },
+  { icon: Store,           label: 'Marketplace',   href: '#',                           routed: false },
+  { icon: CreditCard,      label: 'Billing',       href: '#',                           routed: false },
+  { icon: Settings,        label: 'Settings',      href: '/dashboard/settings',         routed: true  },
 ]
 
 export function DashboardSidebar() {
