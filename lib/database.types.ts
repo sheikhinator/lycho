@@ -35,6 +35,7 @@ export type Database = {
           deleted_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['tenants']['Insert']>
+        Relationships: []
       }
 
       users: {
@@ -59,6 +60,7 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+        Relationships: []
       }
 
       agents: {
@@ -95,6 +97,7 @@ export type Database = {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['agents']['Insert']>
+        Relationships: []
       }
 
       conversations: {
@@ -129,6 +132,7 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['conversations']['Insert']>
+        Relationships: []
       }
 
       subscriptions: {
@@ -163,6 +167,7 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['subscriptions']['Insert']>
+        Relationships: []
       }
 
       agent_versions: {
@@ -187,6 +192,7 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['agent_versions']['Insert']>
+        Relationships: []
       }
 
       audit_log: {
@@ -215,6 +221,7 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['audit_log']['Insert']>
+        Relationships: []
       }
 
       waitlist: {
@@ -244,11 +251,13 @@ export type Database = {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['waitlist']['Insert']>
+        Relationships: []
       }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
     Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
 
