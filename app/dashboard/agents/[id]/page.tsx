@@ -410,8 +410,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  const tabParam = (searchParams.get('tab') ?? 'overview') as Tab
-  const [activeTab, setActiveTab] = useState<Tab>(tabParam)
+  const activeTab = (searchParams.get('tab') ?? 'overview') as Tab
   const [agent, setAgent] = useState<Agent | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -480,7 +479,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
             {TABS.map(t => (
               <button
                 key={t.key}
-                onClick={() => setActiveTab(t.key)}
+                onClick={() => router.push(`/dashboard/agents/${params.id}?tab=${t.key}`)}
                 className="px-4 py-2 text-sm font-sans transition-colors"
                 style={{
                   background: activeTab === t.key ? 'rgba(201,168,76,0.08)' : '#1c1c1c',
