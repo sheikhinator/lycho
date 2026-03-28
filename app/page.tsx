@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Logo } from '@/components/ui/Logo'
@@ -8,22 +8,23 @@ import { Check, ArrowRight, Copy, MessageCircle } from 'lucide-react'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.vercel.app'
 
-export default function Home() {
+// Isolated component so useSearchParams is inside a Suspense boundary
+function RefCapture() {
   const searchParams = useSearchParams()
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) localStorage.setItem('lycho_ref_code', ref.toUpperCase())
+  }, [searchParams])
+  return null
+}
+
+export default function Home() {
   const [email, setEmail]     = useState('')
   const [name, setName]       = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [success, setSuccess] = useState<{ position: number; referral_code: string } | null>(null)
   const [copied, setCopied]   = useState(false)
-
-  // Capture ?ref= from URL and persist to localStorage
-  useEffect(() => {
-    const ref = searchParams.get('ref')
-    if (ref) {
-      localStorage.setItem('lycho_ref_code', ref.toUpperCase())
-    }
-  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -87,6 +88,10 @@ export default function Home() {
       className="min-h-screen flex flex-col items-center justify-center px-5"
       style={{ background: '#070707' }}
     >
+      <Suspense fallback={null}>
+        <RefCapture />
+      </Suspense>
+
       <div className="w-full max-w-md text-center">
 
         {/* Logo */}
