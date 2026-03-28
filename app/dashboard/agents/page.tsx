@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MessageSquare, Settings, RefreshCw, Bot } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { DeployAgentModal } from '@/components/dashboard/DeployAgentModal'
 import { ChannelIcon } from '@/components/ui/ChannelIcon'
 import { SkeletonCard } from '@/components/ui/Skeleton'
@@ -212,13 +213,15 @@ export default function AgentsPage() {
     }
   }
 
+  useEffect(() => { document.title = 'Your Agents — LYCHO' }, [])
+
   return (
     <div className="flex" style={{ background: '#070707', minHeight: '100vh' }}>
       <DashboardSidebar />
 
-      <div className="flex flex-col flex-1" style={{ marginLeft: '240px', minHeight: '100vh' }}>
-        {/* Header */}
-        <main className="flex-1 p-10">
+      <div className="flex flex-col flex-1 min-w-0 lg:ml-60">
+        <DashboardTopBar />
+        <main className="flex-1 p-4 lg:p-10">
           <div className="flex items-end justify-between mb-8">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] mb-1 font-sans" style={{ color: '#7a6130' }}>

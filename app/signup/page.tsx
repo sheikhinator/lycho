@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button, Input } from '@/components/ui'
@@ -30,6 +30,8 @@ const selectClass =
 export default function SignupPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => { document.title = 'Create Account — LYCHO' }, [])
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     businessName: '',

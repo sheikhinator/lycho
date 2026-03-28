@@ -36,6 +36,10 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: 'LYCHO — Intelligence. Transmitted.',
   description: 'Universal AI agent platform for Pakistani and global businesses.',
+  icons: {
+    icon: '/lycho-logo.svg',
+    shortcut: '/lycho-logo.svg',
+  },
 }
 
 export default function RootLayout({

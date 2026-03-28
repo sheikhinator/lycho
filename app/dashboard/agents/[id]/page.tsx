@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, RotateCcw } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { ChannelIcon } from '@/components/ui/ChannelIcon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
@@ -437,6 +438,12 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
 
   useEffect(() => { fetchAgent() }, [fetchAgent])
 
+  useEffect(() => {
+    if (agent) {
+      document.title = `${agent.display_name ?? agent.agent_type} — LYCHO`
+    }
+  }, [agent])
+
   const TABS: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'config',   label: 'Configuration' },
@@ -447,8 +454,9 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     <div className="flex" style={{ background: '#070707', minHeight: '100vh' }}>
       <DashboardSidebar />
 
-      <div className="flex flex-col flex-1" style={{ marginLeft: '240px', minHeight: '100vh' }}>
-        <main className="flex-1 p-10">
+      <div className="flex flex-col flex-1 min-w-0 lg:ml-60">
+        <DashboardTopBar />
+        <main className="flex-1 p-4 lg:p-10">
           {/* Back link */}
           <Link
             href="/dashboard/agents"

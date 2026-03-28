@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase'
+import { SidebarProvider } from '@/components/providers/SidebarContext'
 
 export default async function DashboardLayout({
   children,
@@ -12,7 +13,7 @@ export default async function DashboardLayout({
 
   if (!session) redirect('/login')
 
-  // Dead-man's switch — update last_login_at on every dashboard load
+  // Update last_login_at on every dashboard load
   const admin = createAdminClient()
   await admin
     .from('users')
@@ -20,8 +21,10 @@ export default async function DashboardLayout({
     .eq('id', session.user.id)
 
   return (
-    <div style={{ background: '#070707', minHeight: '100vh' }}>
-      {children}
-    </div>
+    <SidebarProvider>
+      <div style={{ background: '#070707', minHeight: '100vh' }}>
+        {children}
+      </div>
+    </SidebarProvider>
   )
 }
