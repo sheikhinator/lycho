@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import {
   Globe, Bell,
-  TrendingUp, TrendingDown,
   Activity, Zap,
   MessageSquare, Mail, Globe2,
 } from 'lucide-react'
@@ -143,6 +142,31 @@ export default async function DashboardPage() {
   const initials = businessName.charAt(0).toUpperCase()
   const trialing = tenant?.plan_status === 'trialing'
   const trialDays = daysRemaining(tenant?.trial_ends_at ?? null)
+
+  // ── Live KPI data ────────────────────────────────────────────────────────────
+  const tenantId = userRow?.tenants?.id ?? null
+
+  const [
+    interactionsRes,
+    activeAgentsRes,
+    revenueRes,
+    recentActivityRes,
+  ] = tenantId
+    ? await Promise.all([
+        supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+        supabase.from('agents').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'active'),
+        supabase.from('subscriptions').select('amount_pkr').eq('tenant_id', tenantId)
+          .gte('current_period_start', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+          .lte('current_period_end', new Date().toISOString()),
+        supabase.from('conversations').select('id, channel, status, contact_identifier, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(10),
+      ])
+    : [{ count: 0 }, { count: 0 }, { data: [] }, { data: [] }]
+
+  const totalInteractions = interactionsRes.count ?? 0
+  const activeAgentsCount = activeAgentsRes.count ?? 0
+  const monthlyRevenue = (revenueRes.data ?? []).reduce((sum: number, s: { amount_pkr: number | null }) => sum + (s.amount_pkr ?? 0), 0)
+  const recentActivity = recentActivityRes.data ?? []
+
   const hColor = healthColor(tenant?.health_score ?? 50)
   const churn  = churnLabel(tenant?.churn_risk_score ?? 0)
 
@@ -243,9 +267,21 @@ export default async function DashboardPage() {
 
           {/* ── KPI Row ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Monthly Revenue"     value="PKR 0" sub="This Month" />
-            <KpiCard label="Total Interactions"  value="0"     sub="All Time" />
-            <KpiCard label="Active Agents"       value="0"     sub="Deployed" />
+            <KpiCard
+              label="Monthly Revenue"
+              value={`PKR ${monthlyRevenue.toLocaleString()}`}
+              sub="This Month"
+            />
+            <KpiCard
+              label="Total Interactions"
+              value={String(totalInteractions)}
+              sub="All Time"
+            />
+            <KpiCard
+              label="Active Agents"
+              value={String(activeAgentsCount)}
+              sub="Deployed"
+            />
             <KpiCard
               label="Health Score"
               value={String(tenant?.health_score ?? 50)}
@@ -312,18 +348,63 @@ export default async function DashboardPage() {
             >
               Recent Activity
             </h2>
-            <div
-              className="rounded-lg p-8 flex flex-col items-center justify-center text-center"
-              style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', minHeight: '160px' }}
-            >
-              <Activity size={32} className="mb-3 opacity-30" style={{ color: '#6b6b6b' }} />
-              <p className="text-sm mb-1" style={{ color: 'rgba(240,235,225,0.6)' }}>
-                No activity yet.
-              </p>
-              <p className="text-xs" style={{ color: '#6b6b6b' }}>
-                Deploy your first agent to get started.
-              </p>
-            </div>
+            {recentActivity.length === 0 ? (
+              <div
+                className="rounded-lg p-8 flex flex-col items-center justify-center text-center"
+                style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', minHeight: '160px' }}
+              >
+                <Activity size={32} className="mb-3 opacity-30" style={{ color: '#6b6b6b' }} />
+                <p className="text-sm mb-1" style={{ color: 'rgba(240,235,225,0.6)' }}>
+                  No activity yet.
+                </p>
+                <p className="text-xs" style={{ color: '#6b6b6b' }}>
+                  Deploy your first agent to get started.
+                </p>
+              </div>
+            ) : (
+              <div
+                className="rounded-lg divide-y"
+                style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderColor: '#2a2a2a' }}
+              >
+                {recentActivity.map((conv: {
+                  id: string
+                  channel: string | null
+                  status: string
+                  contact_identifier: string | null
+                  created_at: string
+                }) => (
+                  <div
+                    key={conv.id}
+                    className="flex items-center justify-between px-5 py-3"
+                    style={{ borderColor: '#2a2a2a' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs uppercase tracking-widest" style={{ color: '#6b6b6b', minWidth: '60px' }}>
+                        {conv.channel ?? 'unknown'}
+                      </span>
+                      <span className="text-sm" style={{ color: '#F0EBE1' }}>
+                        {conv.contact_identifier ?? 'Anonymous'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded"
+                        style={{
+                          background: conv.status === 'open' ? 'rgba(74,222,128,0.1)' : 'rgba(107,107,107,0.12)',
+                          color: conv.status === 'open' ? '#4ade80' : '#6b6b6b',
+                          border: `1px solid ${conv.status === 'open' ? 'rgba(74,222,128,0.25)' : 'rgba(107,107,107,0.25)'}`,
+                        }}
+                      >
+                        {conv.status}
+                      </span>
+                      <span className="text-xs" style={{ color: '#6b6b6b' }}>
+                        {new Date(conv.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* ── ROI Panel ── */}
