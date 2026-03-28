@@ -1,19 +1,6 @@
 -- =============================================================================
 -- LYCHO — Core Schema Migration 001
--- Run this in the Supabase SQL Editor or via: supabase db push
 -- =============================================================================
-
--- ─── Helper: get the authenticated user's tenant_id ──────────────────────────
-CREATE OR REPLACE FUNCTION public.get_tenant_id()
-RETURNS uuid
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT tenant_id FROM public.users WHERE id = auth.uid()
-$$;
-
 
 -- ─── 1. tenants ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.tenants (
@@ -33,17 +20,6 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   deleted_at       timestamptz
 );
 
-ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "tenants_select_own"
-  ON public.tenants FOR SELECT
-  USING (id = public.get_tenant_id());
-
-CREATE POLICY "tenants_update_own"
-  ON public.tenants FOR UPDATE
-  USING (id = public.get_tenant_id());
-
-
 -- ─── 2. users ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.users (
   id              uuid        PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
@@ -56,6 +32,29 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at      timestamptz DEFAULT now()
 );
 
+-- ─── Helper function (created AFTER users table exists) ──────────────────────
+CREATE OR REPLACE FUNCTION public.get_tenant_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT tenant_id FROM public.users WHERE id = auth.uid()
+$$;
+
+-- ─── RLS: tenants ─────────────────────────────────────────────────────────────
+ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "tenants_select_own"
+  ON public.tenants FOR SELECT
+  USING (id = public.get_tenant_id());
+
+CREATE POLICY "tenants_update_own"
+  ON public.tenants FOR UPDATE
+  USING (id = public.get_tenant_id());
+
+-- ─── RLS: users ──────────────────────────────────────────────────────────────
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users_select_own_tenant"
@@ -183,7 +182,6 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
 
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 
--- Tenants can read their own audit trail; only service-role can insert
 CREATE POLICY "audit_log_select_own_tenant"
   ON public.audit_log FOR SELECT
   USING (tenant_id = public.get_tenant_id());
@@ -191,27 +189,25 @@ CREATE POLICY "audit_log_select_own_tenant"
 
 -- ─── 8. waitlist ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.waitlist (
-  id             uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
-  email          text    UNIQUE NOT NULL,
+  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email          text        UNIQUE NOT NULL,
   name           text,
   business_type  text,
   position       serial,
-  referral_code  text    UNIQUE,
+  referral_code  text        UNIQUE,
   referred_by    text,
-  referral_count integer DEFAULT 0,
-  cohort         text    DEFAULT 'standard',
+  referral_count integer     DEFAULT 0,
+  cohort         text        DEFAULT 'standard',
   converted_at   timestamptz,
   created_at     timestamptz DEFAULT now()
 );
 
 ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
 
--- Anyone can join the waitlist
 CREATE POLICY "waitlist_public_insert"
   ON public.waitlist FOR INSERT
   WITH CHECK (true);
 
--- Users can view only their own entry
 CREATE POLICY "waitlist_select_own"
   ON public.waitlist FOR SELECT
   USING (
@@ -220,11 +216,11 @@ CREATE POLICY "waitlist_select_own"
 
 
 -- ─── Indexes ─────────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_users_tenant_id           ON public.users(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_agents_tenant_id          ON public.agents(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_conversations_tenant_id   ON public.conversations(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_conversations_agent_id    ON public.conversations(agent_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id   ON public.subscriptions(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_agent_versions_agent_id   ON public.agent_versions(agent_id);
-CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_id       ON public.audit_log(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_audit_log_created_at      ON public.audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_id          ON public.users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_agents_tenant_id         ON public.agents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_tenant_id  ON public.conversations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_agent_id   ON public.conversations(agent_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id  ON public.subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_agent_versions_agent_id  ON public.agent_versions(agent_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_id      ON public.audit_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at     ON public.audit_log(created_at DESC);
