@@ -99,16 +99,17 @@ function AgentDashCard({ number, name, description, channels, tag }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const supabase = createServerSupabase()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) redirect('/login')
+  const supabase = await createServerSupabase()
+  // Use getUser() for server-validated authentication — not getSession()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const admin = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: userRow } = await admin
     .from('users')
     .select('*, tenants(*)')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single() as { data: { tenants: Tenant | null } | null }
 
   const tenant      = userRow?.tenants ?? null

@@ -8,17 +8,18 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createServerSupabase()
-  const { data: { session } } = await supabase.auth.getSession()
+  const supabase = await createServerSupabase()
+  // Use getUser() for server-validated authentication — not getSession() (cookie-only, no server check)
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!session) redirect('/login')
+  if (!user) redirect('/login')
 
   // Update last_login_at on every dashboard load
   const admin = createAdminClient()
   await admin
     .from('users')
     .update({ last_login_at: new Date().toISOString() })
-    .eq('id', session.user.id)
+    .eq('id', user.id)
 
   return (
     <SidebarProvider>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Dedicated WhatsApp Business webhook handler
-// IMPORTANT: Add WHATSAPP_VERIFY_TOKEN to Vercel environment variables
+// IMPORTANT: Set WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET in Vercel environment variables
 
 import { createAdminClient } from '@/lib/supabase'
 import { sendWhatsAppText } from '@/lib/channels/whatsapp-service'
@@ -11,6 +11,25 @@ import { callClaude, getModel } from '@/lib/claude'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
+import { createHmac, timingSafeEqual } from 'crypto'
+
+// ─── Signature verification ────────────────────────────────────────────────────
+
+async function verifyWhatsAppSignature(req: Request, rawBody: string): Promise<boolean> {
+  const appSecret = process.env.WHATSAPP_APP_SECRET
+  // Fail closed — if app secret is not configured, reject all requests
+  if (!appSecret) return false
+
+  const signature = req.headers.get('x-hub-signature-256')
+  if (!signature?.startsWith('sha256=')) return false
+
+  const expected = 'sha256=' + createHmac('sha256', appSecret).update(rawBody, 'utf8').digest('hex')
+  const sigBuf = Buffer.from(signature)
+  const expBuf = Buffer.from(expected)
+
+  if (sigBuf.length !== expBuf.length) return false
+  return timingSafeEqual(sigBuf, expBuf)
+}
 
 // ─── GET — webhook verification ───────────────────────────────────────────────
 
@@ -20,7 +39,12 @@ export async function GET(request: Request) {
   const token     = searchParams.get('hub.verify_token')
   const challenge = searchParams.get('hub.challenge')
 
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN ?? 'lycho-whatsapp-verify-2027'
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN
+  // Fail closed — no hardcoded fallback; throw if not configured
+  if (!verifyToken) {
+    console.error('[whatsapp webhook] WHATSAPP_VERIFY_TOKEN env var not set')
+    return new Response('Service misconfigured', { status: 500 })
+  }
 
   if (mode === 'subscribe' && token === verifyToken) {
     return new Response(challenge, { status: 200 })
@@ -32,9 +56,22 @@ export async function GET(request: Request) {
 // ─── POST — inbound message handler ──────────────────────────────────────────
 
 export async function POST(request: Request) {
+  let rawBodyText: string
+  try {
+    rawBodyText = await request.text()
+  } catch {
+    return Response.json({ ok: true })
+  }
+
+  // Verify HMAC-SHA256 signature BEFORE processing any payload
+  const signatureValid = await verifyWhatsAppSignature(request, rawBodyText)
+  if (!signatureValid) {
+    return new Response('Forbidden', { status: 403 })
+  }
+
   let body: any
   try {
-    body = await request.json()
+    body = JSON.parse(rawBodyText)
   } catch {
     return Response.json({ ok: true })
   }
@@ -55,7 +92,6 @@ export async function POST(request: Request) {
     const supabase = createAdminClient()
 
     // Find tenant by phoneNumberId stored in channel_connections
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: connRows } = await supabase
       .from('channel_connections')
       .select('*, agents(*), tenants(*)')
@@ -63,7 +99,6 @@ export async function POST(request: Request) {
       .eq('status', 'active') as { data: any[] | null }
 
     // Match by phone_number_id in credentials JSON
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const conn = (connRows ?? []).find((c: any) =>
       c.credentials?.phone_number_id === phoneNumberId ||
       String(c.credentials?.phone_number_id) === phoneNumberId,
@@ -71,6 +106,7 @@ export async function POST(request: Request) {
 
     if (!conn) return Response.json({ ok: true })
 
+    // Tenant + agent are derived from the verified connection — never from request headers/body
     const tenantId = conn.tenant_id as string
     const agentId  = conn.agent_id  as string
 
@@ -189,7 +225,8 @@ export async function POST(request: Request) {
       )
     }
   } catch (error) {
-    console.error('WhatsApp webhook error:', error)
+    // Log error message only — never log the full error object (may contain sensitive data)
+    console.error('[whatsapp webhook] Handler error:', error instanceof Error ? error.message : 'unknown error')
   }
 
   return Response.json({ ok: true })

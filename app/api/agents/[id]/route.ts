@@ -57,6 +57,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const newVersion = current.version + 1
 
+  // Validate status against allowlist to prevent business-logic abuse
+  const VALID_STATUSES = ['active', 'paused', 'configuring'] as const
+  if (body.status !== undefined && !VALID_STATUSES.includes(body.status as typeof VALID_STATUSES[number])) {
+    return err(`Invalid status. Allowed values: ${VALID_STATUSES.join(', ')}`, 'INVALID_STATUS', 400)
+  }
+
   // Build update payload (only include provided fields)
   const updatePayload: Record<string, unknown> = {
     version: newVersion,

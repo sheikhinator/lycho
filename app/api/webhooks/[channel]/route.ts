@@ -8,6 +8,7 @@ import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib
 import { callClaude, getModel }       from '@/lib/claude'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
+import { rateGuard, DEFAULT_LIMITS }  from '@/lib/api'
 
 import { parseWhatsAppMessage, sendWhatsAppMessage, verifyWhatsAppWebhook } from '@/lib/channels/adapters/whatsapp'
 import { parseEmailMessage,    sendEmail }    from '@/lib/channels/adapters/email'
@@ -48,6 +49,9 @@ function buildSystemPrompt(agentType: string, tenant: any, agent: any, extraCont
 }
 
 // ─── Resolve tenant + agent from channel_connections ─────────────────────────
+// SECURITY: tenantId and agentId must ALWAYS come from the database lookup keyed
+// on a verified channel identifier (e.g., phone number, chat ID) — never from
+// request headers or body, which are attacker-controlled.
 
 async function resolveConnection(supabase: any, channelType: string, channelId: string) {
   const { data } = await supabase
@@ -71,7 +75,13 @@ export async function GET(
   const mode      = sp.get('hub.mode')
   const token     = sp.get('hub.verify_token')
   const challenge = sp.get('hub.challenge')
-  const verifyToken = process.env.WEBHOOK_VERIFY_TOKEN ?? 'lycho-verify'
+
+  // Fail closed — no hardcoded fallback; if env var is absent the endpoint is misconfigured
+  const verifyToken = process.env.WEBHOOK_VERIFY_TOKEN
+  if (!verifyToken) {
+    console.error('[webhook GET] WEBHOOK_VERIFY_TOKEN env var not set')
+    return new NextResponse('Service misconfigured', { status: 500 })
+  }
 
   if (channel === 'whatsapp' || channel === 'facebook_messenger' || channel === 'instagram') {
     const result = verifyWhatsAppWebhook(mode, token, challenge, verifyToken)
@@ -89,6 +99,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { channel: string } },
 ) {
+  // Rate-limit all inbound webhook POSTs to prevent token-exhaustion attacks
+  const limited = await rateGuard(req, DEFAULT_LIMITS)
+  if (limited) return limited
+
   const channelParam = params.channel
   const channel      = normaliseChannel(channelParam)
   const supabase     = createAdminClient()
@@ -107,40 +121,38 @@ export async function POST(
   }
 
   // ── 1. Parse inbound message ────────────────────────────────────────────────
-  // Determine tenant/agent from routing header or channel connection
-  const headerTenantId = req.headers.get('x-tenant-id') ?? rawBody?.tenantId ?? ''
-  const headerAgentId  = req.headers.get('x-agent-id')  ?? rawBody?.agentId
-
+  // SECURITY: Do NOT read x-tenant-id / x-agent-id from request headers or body.
+  // Tenant/agent are always resolved from the database keyed on channel identifier.
   let inbound: ReturnType<typeof parseWhatsAppMessage> = null
 
   switch (channel) {
     case 'whatsapp':
-      inbound = parseWhatsAppMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseWhatsAppMessage(rawBody, '', undefined)
       break
     case 'email':
-      inbound = parseEmailMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseEmailMessage(rawBody, '', undefined)
       break
     case 'telegram':
-      inbound = parseTelegramMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseTelegramMessage(rawBody, '', undefined)
       break
     case 'sms':
-      inbound = parseSmsMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseSmsMessage(rawBody, '', undefined)
       break
     case 'slack':
       // Slack challenge response
       if (rawBody?.type === 'url_verification') {
         return NextResponse.json({ challenge: rawBody.challenge })
       }
-      inbound = parseSlackMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseSlackMessage(rawBody, '', undefined)
       break
     case 'instagram':
-      inbound = parseInstagramMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseInstagramMessage(rawBody, '', undefined)
       break
     case 'facebook_messenger':
-      inbound = parseFacebookMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseFacebookMessage(rawBody, '', undefined)
       break
     case 'web_widget':
-      inbound = parseWidgetMessage(rawBody, headerTenantId, headerAgentId ?? undefined)
+      inbound = parseWidgetMessage(rawBody, '', undefined)
       break
     default:
       return NextResponse.json({ ok: false, error: 'Unsupported channel' }, { status: 400 })
@@ -148,13 +160,13 @@ export async function POST(
 
   if (!inbound) return NextResponse.json({ ok: true }) // Ack non-message events
 
-  // ── 2. Resolve connection (lookup agent + tenant if not supplied) ────────────
-  if (!inbound.tenantId || !inbound.agentId) {
-    const conn = await resolveConnection(supabase, channel, inbound.contactIdentifier)
-    if (!conn) return NextResponse.json({ ok: true }) // No connection configured — silently ack
-    inbound.tenantId = inbound.tenantId || conn.tenant_id
-    inbound.agentId  = inbound.agentId  || conn.agent_id
-  }
+  // ── 2. Resolve connection (lookup agent + tenant from DB only) ───────────────
+  const conn = await resolveConnection(supabase, channel, inbound.contactIdentifier)
+  if (!conn) return NextResponse.json({ ok: true }) // No connection configured — silently ack
+
+  // Overwrite any caller-supplied tenant/agent with the authoritative DB values
+  inbound.tenantId = conn.tenant_id
+  inbound.agentId  = conn.agent_id
 
   const agentId  = inbound.agentId  ?? ''
   const tenantId = inbound.tenantId ?? ''
@@ -302,7 +314,7 @@ export async function POST(
 
   // ── 12. Send reply on the originating channel ─────────────────────────────────
   try {
-    const { data: conn } = await supabase
+    const { data: channelConn } = await supabase
       .from('channel_connections')
       .select('*')
       .eq('tenant_id', tenantId)
@@ -310,9 +322,8 @@ export async function POST(
       .eq('status', 'active')
       .single()
 
-    if (conn?.credentials) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const creds = conn.credentials as any
+    if (channelConn?.credentials) {
+      const creds = channelConn.credentials as any
 
       switch (channel) {
         case 'whatsapp':

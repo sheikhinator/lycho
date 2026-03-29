@@ -1,5 +1,6 @@
 // Server-only Supabase client — do NOT import this in client components.
 // Uses next/headers which is only available in server context.
+// next/headers cookies() is async in Next.js 15+.
 import { createServerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import type { Database } from './database.types'
@@ -7,8 +8,8 @@ import type { Database } from './database.types'
 const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export function createServerSupabase() {
-  const cookieStore = cookies()
+export async function createServerSupabase() {
+  const cookieStore = await cookies()
   return createServerClient<Database>(supabaseUrl, supabaseAnon, {
     cookies: {
       get(name: string) {

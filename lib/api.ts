@@ -22,24 +22,26 @@ export async function rateGuard(
   return checkRateLimit(req, opts)
 }
 
-export { AUTH_LIMITS }
+export { AUTH_LIMITS, DEFAULT_LIMITS } from './rate-limit'
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
 export async function getAuthContext() {
-  const supabase = createServerSupabase()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
+  const supabase = await createServerSupabase()
+  // Use getUser() — performs server-side token validation (not getSession() which reads from
+  // cookie without re-validating, leaving it vulnerable to session replay attacks).
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
 
   const { data: userRow } = await supabase
     .from('users')
     .select('tenant_id')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
 
   return {
     supabase,
-    userId: session.user.id,
+    userId: user.id,
     tenantId: userRow?.tenant_id ?? null,
   }
 }
@@ -47,7 +49,7 @@ export async function getAuthContext() {
 // ─── Audit log ────────────────────────────────────────────────────────────────
 
 export async function auditLog(
-  supabase: ReturnType<typeof createServerSupabase>,
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
   {
     tenantId,
     actorId,
