@@ -13,6 +13,7 @@ import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
 import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
+import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 
 // ─── Agent routing helpers ────────────────────────────────────────────────────
 
@@ -313,7 +314,10 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', body.agent_id)
 
-  // 13. Hot lead audit log
+  // 13. Hot lead audit log + email alert
+  const previousLeadScore = (conversation!.metadata as Record<string, unknown>)?.lead_score as number | undefined ?? 50
+  const isNewHotLead = leadScore >= 85 && previousLeadScore < 85
+
   if (leadScore >= 85) {
     await auditLog(supabase, {
       tenantId,
@@ -323,6 +327,35 @@ export async function POST(req: NextRequest) {
       resourceId: conversation!.id as string,
       metadata: { lead_score: leadScore, contact_profile: updatedProfile },
     })
+  }
+
+  const ownerEmail = tenant.business_email as string | undefined
+
+  if (isNewHotLead && ownerEmail) {
+    // Fire-and-forget hot lead alert
+    sendHotLeadAlert(
+      ownerEmail,
+      tenant.business_name ?? 'Your Business',
+      body.contact_identifier,
+      leadScore,
+      conversation!.id as string,
+      updatedMessages.slice(-4),
+      updatedProfile,
+      body.channel,
+    )
+  }
+
+  if (escalated && conversation!.status !== 'escalated' && ownerEmail) {
+    // Fire-and-forget escalation alert
+    sendEscalationAlert(
+      ownerEmail,
+      tenant.business_name ?? 'Your Business',
+      body.contact_identifier,
+      body.channel,
+      conversation!.id as string,
+      metadata?.suggested_next_action ?? 'Conversation requires human intervention',
+      updatedMessages.slice(-4),
+    )
   }
 
   // 14. Message audit log

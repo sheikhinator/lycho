@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { Activity, Zap, MessageSquare, Mail, Globe2 } from 'lucide-react'
+import { Zap, MessageSquare, Mail, Globe2 } from 'lucide-react'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { Button } from '@/components/ui'
 import type { Tenant } from '@/lib/database.types'
 
@@ -117,24 +118,51 @@ export default async function DashboardPage() {
   const trialDays   = daysRemaining(tenant?.trial_ends_at ?? null)
   const tenantId    = tenant?.id ?? null
 
-  const [interactionsRes, activeAgentsRes, revenueRes, recentActivityRes] = tenantId
+  const [interactionsRes, activeAgentsRes, revenueRes, recentActivityRes, agentsRes] = tenantId
     ? await Promise.all([
         supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
         supabase.from('agents').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'active'),
         supabase.from('subscriptions').select('amount_pkr').eq('tenant_id', tenantId)
           .gte('current_period_start', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
           .lte('current_period_end', new Date().toISOString()),
-        supabase.from('conversations').select('id, channel, status, contact_identifier, created_at')
+        supabase.from('conversations').select('id, channel, status, contact_identifier, created_at, agent_id, metadata, messages')
           .eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('agents').select('id, display_name, agent_type').eq('tenant_id', tenantId),
       ])
-    : [{ count: 0 }, { count: 0 }, { data: [] }, { data: [] }]
+    : [{ count: 0 }, { count: 0 }, { data: [] }, { data: [] }, { data: [] }]
 
   const totalInteractions = interactionsRes.count ?? 0
   const activeAgentsCount = activeAgentsRes.count ?? 0
   const monthlyRevenue    = (revenueRes.data ?? []).reduce((sum: number, s: { amount_pkr: number | null }) => sum + (s.amount_pkr ?? 0), 0)
-  const recentActivity    = recentActivityRes.data ?? []
   const hColor            = healthColor(tenant?.health_score ?? 50)
   const churn             = churnLabel(tenant?.churn_risk_score ?? 0)
+
+  // Build agent name map for activity feed
+  const agentMap: Record<string, string> = {}
+  for (const a of (agentsRes.data ?? [])) {
+    const agent = a as { id: string; display_name?: string | null; agent_type?: string | null }
+    agentMap[agent.id] = agent.display_name ?? agent.agent_type ?? 'Agent'
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initialActivity = (recentActivityRes.data ?? []).map((conv: any) => {
+    const msgs = (conv.messages as Array<{ role: string; content: string }>) ?? []
+    const lastMsg = msgs[msgs.length - 1]
+    return {
+      id:                   conv.id,
+      channel:              conv.channel,
+      status:               conv.status,
+      contact_identifier:   conv.contact_identifier,
+      created_at:           conv.created_at,
+      agent_id:             conv.agent_id,
+      agent_name:           agentMap[conv.agent_id] ?? 'Agent',
+      lead_score:           conv.metadata?.lead_score ?? 50,
+      lead_label:           conv.metadata?.lead_label ?? 'cold',
+      sentiment:            conv.metadata?.sentiment ?? 'neutral',
+      last_message_preview: lastMsg?.content?.slice(0, 60) ?? '',
+      escalated:            conv.status === 'escalated',
+    }
+  })
 
   return (
     <div className="flex" style={{ background: '#070707', minHeight: '100vh' }}>
@@ -204,56 +232,10 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          {/* Activity Feed */}
+          {/* Activity Feed — polls every 30s */}
           <section>
-            <h2 className="font-bebas text-2xl tracking-[0.2em] mb-4" style={{ color: '#C9A84C' }}>Recent Activity</h2>
-            {recentActivity.length === 0 ? (
-              <div
-                className="rounded-lg p-8 flex flex-col items-center justify-center text-center"
-                style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', minHeight: '160px' }}
-              >
-                <Activity size={32} className="mb-3 opacity-30" style={{ color: '#6b6b6b' }} />
-                <p className="text-sm font-sans mb-1" style={{ color: 'rgba(240,235,225,0.6)' }}>No activity yet.</p>
-                <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Deploy your first agent to get started.</p>
-              </div>
-            ) : (
-              <div className="rounded-lg" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
-                {recentActivity.map((conv: {
-                  id: string; channel: string | null; status: string
-                  contact_identifier: string | null; created_at: string
-                }) => (
-                  <div
-                    key={conv.id}
-                    className="flex items-center justify-between px-5 py-3"
-                    style={{ borderBottom: '1px solid #2a2a2a' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs font-sans uppercase tracking-widest shrink-0" style={{ color: '#6b6b6b' }}>
-                        {conv.channel ?? 'unknown'}
-                      </span>
-                      <span className="text-sm font-sans truncate" style={{ color: '#F0EBE1' }}>
-                        {conv.contact_identifier ?? 'Anonymous'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span
-                        className="text-xs font-sans px-2 py-0.5 rounded"
-                        style={{
-                          background: conv.status === 'open' ? 'rgba(74,222,128,0.1)' : 'rgba(107,107,107,0.12)',
-                          color: conv.status === 'open' ? '#4ade80' : '#6b6b6b',
-                          border: `1px solid ${conv.status === 'open' ? 'rgba(74,222,128,0.25)' : 'rgba(107,107,107,0.25)'}`,
-                        }}
-                      >
-                        {conv.status}
-                      </span>
-                      <span className="text-xs font-sans hidden sm:block" style={{ color: '#6b6b6b' }}>
-                        {new Date(conv.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <h2 className="font-bebas text-2xl tracking-[0.2em] mb-4" style={{ color: '#C9A84C' }}>Live Activity</h2>
+            <ActivityFeed initialActivity={initialActivity} />
           </section>
 
           {/* ROI Panel */}

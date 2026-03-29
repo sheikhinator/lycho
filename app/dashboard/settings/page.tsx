@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   User, Users, Puzzle, Bell,
   UserPlus, Trash2, ChevronDown, Search,
+  Send, MessageCircle, CheckCircle2, Copy,
 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
@@ -408,9 +409,300 @@ function TeamTab() {
   )
 }
 
+// ─── Telegram Connect Card ────────────────────────────────────────────────────
+
+function TelegramConnectCard({ tenantId }: { tenantId: string }) {
+  const { toast } = useToast()
+  const [open, setOpen]           = useState(false)
+  const [botToken, setBotToken]   = useState('')
+  const [connecting, setConnecting] = useState(false)
+  const [connected, setConnected] = useState(false)
+  const [botUsername, setBotUsername] = useState('')
+  const sb = createClientSupabase()
+
+  async function handleConnect() {
+    if (!botToken.trim()) return
+    setConnecting(true)
+    try {
+      // Get bot info from Telegram
+      const meRes = await fetch(`https://api.telegram.org/bot${botToken}/getMe`)
+      const me = await meRes.json()
+      if (!me.ok) { toast('Invalid bot token — check and try again', 'error'); return }
+
+      const username = me.result.username as string
+      const botId    = me.result.id as number
+      const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? ''
+      const webhookUrl = `${appUrl}/api/webhooks/telegram`
+
+      // Register webhook with Telegram
+      await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl }),
+      })
+
+      // Get or create default agent for this tenant
+      const { data: agents } = await sb.from('agents').select('id').eq('tenant_id', tenantId).limit(1)
+      const agentId = agents?.[0]?.id ?? null
+
+      // Upsert channel_connections
+      await sb.from('channel_connections').upsert({
+        tenant_id:          tenantId,
+        agent_id:           agentId,
+        channel_type:       'telegram',
+        channel_identifier: String(botId),
+        status:             'active',
+        credentials:        { bot_token: botToken, bot_username: username },
+      }, { onConflict: 'tenant_id,channel_type' })
+
+      setBotUsername(username)
+      setConnected(true)
+      toast(`Telegram bot @${username} connected!`, 'success')
+    } catch (e) {
+      toast('Failed to connect bot — please try again', 'error')
+      console.error(e)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  if (connected) {
+    return (
+      <div className="rounded-lg p-5" style={{ background: '#1c1c1c', border: '1px solid rgba(0,136,204,0.3)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style={{ background: 'rgba(0,136,204,0.1)', border: '1px solid rgba(0,136,204,0.2)' }}>
+            ✈️
+          </div>
+          <div>
+            <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>Telegram</p>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={12} style={{ color: '#4ade80' }} />
+              <span className="text-xs font-sans" style={{ color: '#4ade80' }}>Connected</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs font-sans mb-3" style={{ color: '#6b6b6b' }}>
+          Your bot is live. Share this link with customers:
+        </p>
+        <div
+          className="flex items-center justify-between px-3 py-2 rounded"
+          style={{ background: '#141414', border: '1px solid #2a2a2a' }}
+        >
+          <code className="text-sm font-mono" style={{ color: '#0088cc' }}>t.me/{botUsername}</code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(`https://t.me/${botUsername}`); toast('Link copied!', 'success') }}
+            className="p-1 rounded transition-colors"
+            style={{ color: '#6b6b6b' }}
+            title="Copy link"
+          >
+            <Copy size={13} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg p-5" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style={{ background: 'rgba(0,136,204,0.1)', border: '1px solid rgba(0,136,204,0.2)' }}>
+            ✈️
+          </div>
+          <div>
+            <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>Telegram</p>
+            <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>Connect a Telegram bot</p>
+          </div>
+        </div>
+        <span className="text-xs font-sans px-2 py-0.5 rounded" style={{ background: 'rgba(74,222,128,0.08)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }}>Live</span>
+      </div>
+
+      {!open ? (
+        <Button variant="secondary" size="sm" onClick={() => setOpen(true)} className="gap-2 w-full">
+          <Send size={13} /> Connect Telegram Bot
+        </Button>
+      ) : (
+        <div className="space-y-4">
+          <div
+            className="rounded-lg p-4 text-xs font-sans space-y-1.5"
+            style={{ background: 'rgba(0,136,204,0.05)', border: '1px solid rgba(0,136,204,0.15)' }}
+          >
+            <p style={{ color: '#F0EBE1', fontWeight: 600, marginBottom: '8px' }}>How to get your bot token:</p>
+            {[
+              'Open Telegram and search for @BotFather',
+              'Send /newbot and follow the instructions',
+              'Copy the bot token provided',
+              'Paste it below and click Connect Bot',
+            ].map((step, i) => (
+              <p key={i} style={{ color: '#6b6b6b' }}>
+                <span style={{ color: '#0088cc' }}>{i + 1}.</span> {step}
+              </p>
+            ))}
+          </div>
+
+          <div>
+            <FieldLabel>Bot Token</FieldLabel>
+            <FieldInput
+              value={botToken}
+              onChange={setBotToken}
+              placeholder="1234567890:ABCDefghIJKLmnopQRSTUVwxyz"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" disabled={connecting || !botToken} onClick={handleConnect}>
+              {connecting ? 'Connecting…' : 'Connect Bot'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── WhatsApp Connect Card ────────────────────────────────────────────────────
+
+function WhatsAppConnectCard({ tenantId }: { tenantId: string }) {
+  const { toast } = useToast()
+  const [step, setStep]         = useState<0 | 1 | 2 | 3>(0)
+  const [phone, setPhone]       = useState('')
+  const [saving, setSaving]     = useState(false)
+  const sb = createClientSupabase()
+
+  async function handleSave() {
+    if (!phone.trim()) return
+    setSaving(true)
+    try {
+      await sb.from('channel_connections').upsert({
+        tenant_id:          tenantId,
+        channel_type:       'whatsapp',
+        channel_identifier: phone,
+        status:             'pending',
+        credentials:        { phone_number: phone, access_token: 'pending', phone_number_id: 'pending' },
+      }, { onConflict: 'tenant_id,channel_type' })
+
+      setStep(3)
+      toast('WhatsApp connection request saved. We\'ll be in touch.', 'success')
+    } catch {
+      toast('Failed to save — please try again', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (step === 3) {
+    return (
+      <div className="rounded-lg p-5" style={{ background: '#1c1c1c', border: '1px solid rgba(37,211,102,0.2)' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.2)' }}>
+            💬
+          </div>
+          <div>
+            <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>WhatsApp</p>
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#fbbf24' }} />
+              <span className="text-xs font-sans" style={{ color: '#fbbf24' }}>Pending Meta approval</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs font-sans mt-3" style={{ color: '#6b6b6b' }}>
+          We&apos;ll notify you at {phone} when your WhatsApp Business connection is approved and live.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg p-5" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.2)' }}>
+            💬
+          </div>
+          <div>
+            <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>WhatsApp Business</p>
+            <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>via Meta Business API</p>
+          </div>
+        </div>
+        <span className="text-xs font-sans px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.08)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+          Requires Approval
+        </span>
+      </div>
+
+      {step === 0 && (
+        <Button variant="secondary" size="sm" onClick={() => setStep(1)} className="gap-2 w-full">
+          <MessageCircle size={13} /> Connect WhatsApp Business
+        </Button>
+      )}
+
+      {step === 1 && (
+        <div className="space-y-4">
+          <div
+            className="rounded-lg p-4"
+            style={{ background: 'rgba(37,211,102,0.04)', border: '1px solid rgba(37,211,102,0.12)' }}
+          >
+            <p className="text-xs font-sans font-medium mb-3" style={{ color: '#F0EBE1' }}>Step 1 of 3 — Install WhatsApp Business</p>
+            <p className="text-xs font-sans mb-3" style={{ color: '#6b6b6b' }}>
+              Download the free WhatsApp Business app on your phone to manage your business profile.
+            </p>
+            <div className="flex gap-2">
+              <a
+                href="https://apps.apple.com/app/whatsapp-business/id1386412985"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-sans"
+                style={{ background: '#141414', color: '#F0EBE1', border: '1px solid #2a2a2a' }}
+              >
+                🍎 App Store
+              </a>
+              <a
+                href="https://play.google.com/store/apps/details?id=com.whatsapp.w4b"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-sans"
+                style={{ background: '#141414', color: '#F0EBE1', border: '1px solid #2a2a2a' }}
+              >
+                🤖 Play Store
+              </a>
+            </div>
+          </div>
+          <Button variant="primary" size="sm" onClick={() => setStep(2)}>Done — Next Step →</Button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <div
+            className="rounded-lg p-4"
+            style={{ background: 'rgba(37,211,102,0.04)', border: '1px solid rgba(37,211,102,0.12)' }}
+          >
+            <p className="text-xs font-sans font-medium mb-1" style={{ color: '#F0EBE1' }}>Step 2 of 3 — Enter Your Phone Number</p>
+            <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>The number you use for WhatsApp Business.</p>
+          </div>
+          <div>
+            <FieldLabel>WhatsApp Business Phone Number</FieldLabel>
+            <FieldInput
+              value={phone}
+              onChange={setPhone}
+              placeholder="+92 300 0000000"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" disabled={saving || !phone} onClick={handleSave}>
+              {saving ? 'Saving…' : 'Save — Notify Me When Ready'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setStep(0)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Tab: Integrations ────────────────────────────────────────────────────────
 
-function IntegrationsTab() {
+function IntegrationsTab({ tenantId }: { tenantId: string | null }) {
   const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<IntegrationCategory | 'all'>('all')
@@ -429,12 +721,24 @@ function IntegrationsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Messaging Channels */}
+      <div>
+        <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#6b6b6b' }}>Messaging Channels</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {tenantId && <TelegramConnectCard tenantId={tenantId} />}
+          {tenantId && <WhatsAppConnectCard tenantId={tenantId} />}
+        </div>
+      </div>
+
       {/* Header stats */}
-      <div className="flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex gap-4 text-xs font-sans" style={{ color: '#6b6b6b' }}>
-          <span><span style={{ color: '#C9A84C' }}>{liveCount}</span> live</span>
-          <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length - liveCount}</span> coming soon</span>
-          <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length}</span> total</span>
+      <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: '24px' }}>
+        <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#6b6b6b' }}>All Integrations</p>
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex gap-4 text-xs font-sans" style={{ color: '#6b6b6b' }}>
+            <span><span style={{ color: '#C9A84C' }}>{liveCount}</span> live</span>
+            <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length - liveCount}</span> coming soon</span>
+            <span><span style={{ color: '#F0EBE1' }}>{INTEGRATIONS_CATALOGUE.length}</span> total</span>
+          </div>
         </div>
       </div>
 
@@ -665,7 +969,7 @@ export default function SettingsPage() {
           {/* Tab content */}
           {activeTab === 'profile'       && (tenantId ? <ProfileTab tenantId={tenantId} /> : <Skeleton width="100%" height="300px" />)}
           {activeTab === 'team'          && <TeamTab />}
-          {activeTab === 'integrations'  && <IntegrationsTab />}
+          {activeTab === 'integrations'  && <IntegrationsTab tenantId={tenantId} />}
           {activeTab === 'notifications' && <NotificationsTab />}
         </main>
       </div>

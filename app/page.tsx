@@ -546,12 +546,16 @@ export default function Home() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">
               <Logo size="sm" />
               <div className="flex flex-wrap gap-6">
-                {['Product', 'Pricing', 'About', 'Contact', 'Privacy'].map(l => (
+                {(['Product', 'Pricing', 'About', 'Contact', 'Privacy'] as const).map(l => (
                   <a key={l} href="#" className="text-xs font-sans transition-colors" style={{ color: '#6b6b6b' }}
                     onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#F0EBE1')}
                     onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b6b6b')}
                   >{l}</a>
                 ))}
+                <a href="/developers" className="text-xs font-sans transition-colors" style={{ color: '#6b6b6b' }}
+                  onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#C9A84C')}
+                  onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b6b6b')}
+                >Developers</a>
               </div>
             </div>
             <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: '24px' }} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
