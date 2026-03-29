@@ -4,7 +4,16 @@ import type { NextRequest } from 'next/server'
 
 const PROTECTED = ['/dashboard', '/agents', '/conversations', '/billing', '/settings', '/onboarding']
 
+// Public routes — skip Supabase session check entirely
+const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components']
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Skip session check for explicitly public routes
+  const isPublic = PUBLIC.some(p => pathname === p || pathname.startsWith(p + '/'))
+  if (isPublic) return NextResponse.next({ request: { headers: request.headers } })
+
   const response = NextResponse.next({ request: { headers: request.headers } })
 
   const supabase = createServerClient(
@@ -31,11 +40,11 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  const isProtected = PROTECTED.some(p => request.nextUrl.pathname.startsWith(p))
+  const isProtected = PROTECTED.some(p => pathname.startsWith(p))
 
   if (isProtected && !session) {
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', request.nextUrl.pathname)
+    loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
