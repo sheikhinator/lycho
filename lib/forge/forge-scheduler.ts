@@ -1,5 +1,4 @@
 import { callClaude, MODELS } from '@/lib/claude'
-import { AUTONOMOUS_FORGE_PROMPT } from '@/lib/agents/forge-agent'
 import { AGENT_CATALOGUE } from '@/lib/agents-catalogue'
 import { Resend } from 'resend'
 
@@ -58,14 +57,37 @@ export async function runAutonomousForge(supabase: any): Promise<{ agents_queued
   const queuedTypes = new Set<string>((queueRows ?? []).map((r: { agent_type: string }) => r.agent_type))
 
   // 3. Build prompt
-  const prompt = `${AUTONOMOUS_FORGE_PROMPT}\n\nExisting agents (avoid duplicating): ${existingTypes.join(', ')}\nToday: ${new Date().toISOString()}`
+  const prompt = `You are the Forge Agent for LYCHO.
 
-  // 4. Call Claude
+Date: ${new Date().toISOString().split('T')[0]}
+Avoid duplicating: ${existingTypes.slice(0, 50).join(', ') || 'none'}
+
+Rules:
+- Output ONLY valid JSON array. Zero prose. Zero markdown. Zero explanation.
+- Maximum 5 agents per run
+- Each system_prompt maximum 400 words
+- Be specific and practical — real business problems only
+- Prioritise Pakistan/GCC markets first, then global
+
+[{
+  "agent_type": "slug",
+  "display_name": "Name",
+  "description": "One line",
+  "system_prompt": "Concise complete prompt under 400 words. Include: role, capabilities, language support (all languages), Human Sovereignty constraints, METADATA block protocol",
+  "recommended_channels": ["whatsapp"],
+  "model_complexity": "simple",
+  "estimated_value_pkr": 45000,
+  "sector_tags": ["sector"],
+  "use_case_examples": ["Example 1","Example 2","Example 3"],
+  "why_novel": "One line gap explanation"
+}]`
+
+  // 4. Call Claude (Haiku — 10x cheaper, sufficient for structured JSON)
   const { response } = await callClaude({
     systemPrompt: prompt,
     messages: [{ role: 'user', content: 'Generate 5 novel agent specifications now.' }],
-    model: MODELS.smart,
-    maxTokens: 4000,
+    model: MODELS.fast,
+    maxTokens: 2000,
     useCache: false,
   })
 
