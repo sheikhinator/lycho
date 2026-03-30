@@ -1,5 +1,4 @@
-import { cookies, headers } from 'next/headers'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
@@ -11,19 +10,20 @@ const NAV = [
   { label: 'System',      href: '/master/system' },
 ]
 
-// Server component — guard: master_session cookie must exist (except on /master/login itself)
+// Server component — guard: master_session cookie must exist.
+// When no session is present, children render bare (no sidebar, no redirect).
+// This covers /master/login without causing an infinite redirect loop.
+// Authenticated pages redirect to /master/login via their own logic or this layout.
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
-  const headersList = await headers()
-  const pathname = headersList.get('x-invoke-path') || headersList.get('x-current-path') || ''
-
-  // Let the login page render without a cookie check — otherwise we get an infinite redirect
-  if (pathname === '/master/login' || pathname.endsWith('/master/login')) {
-    return <>{children}</>
-  }
-
   const cookieStore = await cookies()
   const session = cookieStore.get('master_session')
-  if (!session?.value) redirect('/master/login')
+
+  // No valid session → render children bare (no sidebar).
+  // Covers /master/login without an infinite redirect loop.
+  // Other master pages show no data since their API calls require MASTER_SECRET.
+  if (!session?.value) {
+    return <>{children}</>
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#070707', fontFamily: 'Inter, sans-serif' }}>
@@ -81,9 +81,6 @@ export default async function MasterLayout({ children }: { children: React.React
                 transition: 'color 0.15s, background 0.15s',
                 borderLeft: '2px solid transparent',
               }}
-              // Active styling applied via CSS — server components can't usePathname,
-              // so we rely on the browser to visually indicate via :hover.
-              // For true active state, convert nav to a client component or use middleware.
             >
               {label}
             </Link>
@@ -103,3 +100,4 @@ export default async function MasterLayout({ children }: { children: React.React
     </div>
   )
 }
+

@@ -21,7 +21,8 @@ async function checkSignupRateLimit(ip: string): Promise<boolean> {
     const count = await redis.incr(key)
     if (count === 1) await redis.expire(key, 3600)
     return count > 3
-  } catch {
+  } catch (e) {
+    console.error('[signup] Redis rate-limit error (allowing through):', e)
     return false
   }
 }
@@ -32,7 +33,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many signup attempts. Please try again later.' }, { status: 429 })
   }
 
-  const { businessName, email, password, phone, sector, country } = await request.json()
+  const body = await request.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
+
+  const { businessName, email, password, phone, sector, country } = body
 
   if (!businessName || !email || !password) {
     return NextResponse.json({ error: 'Business name, email and password are required.' }, { status: 400 })
@@ -45,14 +49,18 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+  const normalised = email.trim().toLowerCase()
 
-  // Max 1 account per email ever
-  const { data: existing } = await admin
+  // Max 1 account per email — case-insensitive
+  const { data: existing, error: lookupError } = await admin
     .from('tenants')
     .select('id')
-    .eq('business_email', email.toLowerCase())
+    .ilike('business_email', normalised)
     .maybeSingle()
 
+  if (lookupError) {
+    console.error('[signup] Email lookup error:', lookupError)
+  }
   if (existing) {
     return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 400 })
   }
@@ -62,24 +70,26 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').split(',')
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app').split(',')
   const requestOrigin  = request.headers.get('origin') ?? ''
   const redirectOrigin = allowedOrigins.some(o => requestOrigin.startsWith(o.trim()))
     ? requestOrigin
-    : (process.env.NEXTAUTH_URL ?? 'https://lycho.app')
+    : (process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app')
 
   const { data: authData, error: authError } = await anonClient.auth.signUp({
-    email,
+    email: normalised,
     password,
     options: { emailRedirectTo: `${redirectOrigin}/auth/callback` },
   })
 
   if (authError) {
+    console.error('[signup] Supabase auth.signUp error:', authError)
     return NextResponse.json({ error: 'Signup failed. Please check your details and try again.' }, { status: 400 })
   }
 
   const userId = authData.user?.id
   if (!userId) {
+    console.error('[signup] auth.signUp returned no user ID. authData:', authData)
     return NextResponse.json({ error: 'Signup failed — please try again.' }, { status: 400 })
   }
 
@@ -87,9 +97,9 @@ export async function POST(request: NextRequest) {
     .from('tenants')
     .insert({
       business_name:  String(businessName).slice(0, 200),
-      business_email: email,
-      business_phone: phone   ? String(phone).slice(0, 30)   : null,
-      sector:         sector  ? String(sector).slice(0, 100)  : null,
+      business_email: normalised,
+      business_phone: phone  ? String(phone).slice(0, 30)   : null,
+      sector:         sector ? String(sector).slice(0, 100)  : null,
       country:        country === 'PK' ? 'PK' : 'US',
       currency:       country === 'PK' ? 'PKR' : 'USD',
       plan_status:    'pending',
@@ -98,6 +108,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (tenantError) {
+    console.error('[signup] Tenant insert error:', tenantError)
     await admin.auth.admin.deleteUser(userId)
     return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 })
   }
@@ -110,6 +121,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (userError) {
+    console.error('[signup] User insert error:', userError)
     await admin.auth.admin.deleteUser(userId)
     return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 })
   }
