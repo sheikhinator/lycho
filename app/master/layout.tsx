@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -11,8 +11,16 @@ const NAV = [
   { label: 'System',      href: '/master/system' },
 ]
 
-// Server component — guard: master_session cookie must exist
+// Server component — guard: master_session cookie must exist (except on /master/login itself)
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers()
+  const pathname = headersList.get('x-current-path') ?? ''
+
+  // Let the login page render without a cookie check — otherwise we get an infinite redirect
+  if (pathname === '/master/login') {
+    return <>{children}</>
+  }
+
   const cookieStore = await cookies()
   const session = cookieStore.get('master_session')
   if (!session?.value) redirect('/master/login')
