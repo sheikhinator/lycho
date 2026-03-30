@@ -11,6 +11,8 @@ export default function MasterPanel() {
   const [section, setSection] = useState<Section>('dashboard')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [forgeLoading, setForgeLoading] = useState(false)
+  const [forgeResult, setForgeResult] = useState('')
 
   useEffect(() => {
     const saved = sessionStorage.getItem('lycho_master')
@@ -38,6 +40,28 @@ export default function MasterPanel() {
       setData(json)
     } catch { setData(null) }
     setLoading(false)
+  }
+
+  async function runForge() {
+    setForgeLoading(true)
+    setForgeResult('')
+    try {
+      const res = await fetch('/api/forge/autonomous', {
+        method: 'POST',
+        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+      })
+      const json = await res.json()
+      if (res.ok) {
+        const queued = json.data?.agents_queued ?? json.agents_queued ?? 0
+        setForgeResult(`✅ Success — ${queued} agents queued`)
+        loadSection('forge')
+      } else {
+        setForgeResult(`❌ Error: ${json.error || json.message || res.status}`)
+      }
+    } catch(e: any) {
+      setForgeResult(`❌ Failed: ${e.message}`)
+    }
+    setForgeLoading(false)
   }
 
   useEffect(() => { if (authed) loadSection('dashboard') }, [authed])
@@ -149,15 +173,14 @@ export default function MasterPanel() {
             )}
             {section === 'forge' && (
               <div>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:forgeResult?12:24}}>
                   <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,letterSpacing:1}}>FORGE QUEUE</h2>
-                  <button onClick={async()=>{
-                    await fetch('/api/forge/autonomous',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
-                    loadSection('forge')
-                  }} style={{background:'#C9A84C',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                    Run Forge Now
+                  <button onClick={runForge} disabled={forgeLoading}
+                    style={{background:forgeLoading?'#7a6130':'#C9A84C',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:forgeLoading?'not-allowed':'pointer'}}>
+                    {forgeLoading ? 'Running…' : 'Run Forge Now'}
                   </button>
                 </div>
+                {forgeResult && <p style={{color:forgeResult.startsWith('✅')?'#34d399':'#ef4444',fontSize:13,marginBottom:16}}>{forgeResult}</p>}
                 {(data.queue||[]).length===0 && <p style={{color:'#444'}}>No agents in queue. Run Forge to generate new agents.</p>}
                 {(data.queue||[]).map((agent:any)=>(
                   <div key={agent.id} style={{background:'#111',border:'1px solid #1a1a1a',borderRadius:8,padding:20,marginBottom:16}}>
