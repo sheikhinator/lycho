@@ -1,27 +1,9 @@
 import { callClaude, MODELS } from '@/lib/claude'
-import { AGENT_CATALOGUE } from '@/lib/agents-catalogue'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM    = 'LYCHO Forge <forge@lycho.ai>'
 
-// Collect all existing agent type slugs from the catalogue
-function getExistingTypes(): string[] {
-  const types: string[] = []
-  for (const agent of AGENT_CATALOGUE.core)           types.push(agent.type)
-  for (const agent of AGENT_CATALOGUE.business_suite) types.push(agent.type)
-  for (const agents of Object.values(AGENT_CATALOGUE.sectors)) {
-    for (const agent of agents) types.push(agent.type)
-  }
-  return types
-}
-
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/```json\s*/gi, '')
-    .replace(/```\s*/g, '')
-    .trim()
-}
 
 interface ForgedAgent {
   agent_type: string
@@ -38,23 +20,14 @@ interface ForgedAgent {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function runAutonomousForge(supabase: any): Promise<{ agents_queued: number }> {
-  // 1. Get existing slugs — from DB first, fall back to catalogue constants
-  const { data: dbRows } = await supabase
-    .from('agents_catalogue')
-    .select('agent_type')
-    .limit(500)
-
-  const catalogueTypes = getExistingTypes()
-  const dbTypes: string[] = (dbRows ?? []).map((r: { agent_type: string }) => r.agent_type)
-  const existingTypes = Array.from(new Set([...catalogueTypes, ...dbTypes]))
-
-  // 2. Get types already in the queue (not rejected) to avoid re-queuing
+  // 1. Get types already in the forge_queue (not rejected) — only source of truth for dedup
   const { data: queueRows } = await supabase
     .from('forge_queue')
     .select('agent_type')
     .neq('status', 'rejected')
 
-  const queuedTypes = new Set<string>((queueRows ?? []).map((r: { agent_type: string }) => r.agent_type))
+  const existingTypes: string[] = (queueRows ?? []).map((r: { agent_type: string }) => r.agent_type)
+  console.log('Existing types in forge_queue:', existingTypes)
 
   // 3. Build prompt
   const prompt = `You are the Forge Agent for LYCHO.
@@ -91,17 +64,25 @@ Rules:
     useCache: false,
   })
 
-  // 5. Parse JSON array — strip any markdown wrapper
+  // 5. Parse JSON array — find array even if there's extra text
+  console.log('Raw Claude response:', response)
   let agents: ForgedAgent[] = []
   try {
-    agents = JSON.parse(stripMarkdown(response))
-    if (!Array.isArray(agents)) agents = []
-  } catch {
-    return { agents_queued: 0 }
+    const match = response.match(/\[[\s\S]*\]/)
+    if (!match) throw new Error('No JSON array found in response')
+    agents = JSON.parse(match[0])
+    if (!Array.isArray(agents)) throw new Error('Parsed value is not an array')
+    console.log('Parsed', agents.length, 'agents:', agents.map(a => a?.agent_type))
+  } catch(e) {
+    console.error('JSON parse error:', e)
+    console.error('Raw text was:', response)
+    throw new Error(`Forge failed to parse Claude response: ${e}`)
   }
 
   // 6. Filter out already-queued types, then insert
-  const toInsert = agents.filter(a => a?.agent_type && !queuedTypes.has(a.agent_type))
+  const existingSet = new Set(existingTypes)
+  const toInsert = agents.filter(a => a?.agent_type && !existingSet.has(a.agent_type))
+  console.log('Novel agents after filter:', toInsert.map(a => a.agent_type))
 
   if (toInsert.length === 0) return { agents_queued: 0 }
 
@@ -124,7 +105,8 @@ Rules:
   )
 
   if (error) {
-    return { agents_queued: 0 }
+    console.error('Supabase insert error:', error)
+    throw new Error(`DB insert failed: ${error.message}`)
   }
 
   // 7. Notify master
