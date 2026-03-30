@@ -26,11 +26,15 @@ export default async function DashboardLayout({
   if (userRow?.tenant_id && currentPath !== '/dashboard/activate') {
     const { data: tenant } = await admin
       .from('tenants')
-      .select('plan_status')
+      .select('plan_status, plan, business_email')
       .eq('id', userRow.tenant_id)
       .single()
 
-    if (tenant?.plan_status === 'pending' || tenant?.plan_status === 'expired') {
+    const isEnterprise =
+      tenant?.plan === 'enterprise' ||
+      tenant?.business_email === process.env.MASTER_EMAIL
+
+    if (!isEnterprise && (tenant?.plan_status === 'pending' || tenant?.plan_status === 'expired')) {
       redirect('/dashboard/activate')
     }
   }

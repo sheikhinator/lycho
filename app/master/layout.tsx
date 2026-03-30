@@ -14,10 +14,10 @@ const NAV = [
 // Server component — guard: master_session cookie must exist (except on /master/login itself)
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
   const headersList = await headers()
-  const pathname = headersList.get('x-current-path') ?? ''
+  const pathname = headersList.get('x-invoke-path') || headersList.get('x-current-path') || ''
 
   // Let the login page render without a cookie check — otherwise we get an infinite redirect
-  if (pathname === '/master/login') {
+  if (pathname === '/master/login' || pathname.endsWith('/master/login')) {
     return <>{children}</>
   }
 
