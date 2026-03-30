@@ -68,9 +68,10 @@ async function resolveConnection(supabase: any, channelType: string, channelId: 
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { channel: string } },
+  { params }: { params: Promise<{ channel: string }> },
 ) {
-  const channel   = normaliseChannel(params.channel)
+  const { channel: channelSlug } = await params
+  const channel   = normaliseChannel(channelSlug)
   const sp        = req.nextUrl.searchParams
   const mode      = sp.get('hub.mode')
   const token     = sp.get('hub.verify_token')
@@ -97,13 +98,13 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { channel: string } },
+  { params }: { params: Promise<{ channel: string }> },
 ) {
   // Rate-limit all inbound webhook POSTs to prevent token-exhaustion attacks
   const limited = await rateGuard(req, DEFAULT_LIMITS)
   if (limited) return limited
 
-  const channelParam = params.channel
+  const { channel: channelParam } = await params
   const channel      = normaliseChannel(channelParam)
   const supabase     = createAdminClient()
 

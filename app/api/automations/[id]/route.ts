@@ -4,8 +4,9 @@ import { getAuthContext, ok, err } from '@/lib/api'
 // GET /api/automations/[id]
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant', 'NO_TENANT', 403)
@@ -14,7 +15,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('automations')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -31,8 +32,9 @@ export async function GET(
 // PUT /api/automations/[id]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant', 'NO_TENANT', 403)
@@ -51,7 +53,7 @@ export async function PUT(
   const { data: existing } = await supabase
     .from('automations')
     .select('action_config, trigger_config')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -82,7 +84,7 @@ export async function PUT(
   const { data, error } = await supabase
     .from('automations')
     .update(updatePayload)
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
     .single()
@@ -94,8 +96,9 @@ export async function PUT(
 // DELETE /api/automations/[id]
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant', 'NO_TENANT', 403)
@@ -104,7 +107,7 @@ export async function DELETE(
   const { error } = await supabase
     .from('automations')
     .delete()
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
 
   if (error) return err(error.message, 'DB_ERROR', 500)

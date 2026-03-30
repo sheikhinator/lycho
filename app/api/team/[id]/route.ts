@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err } from '@/lib/api'
 import { createAdminClient } from '@/lib/supabase'
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 // PUT /api/team/[id] — update team member role
 export async function PUT(req: NextRequest, { params }: Params) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -26,7 +27,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { data: target } = await supabase
     .from('users')
     .select('role')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -44,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { error } = await supabase
     .from('users')
     .update({ role: body.role })
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
 
   if (error) return err(error.message, 'DB_ERROR', 500)
@@ -54,15 +55,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     actorId: userId,
     action: 'team.role_changed',
     resourceType: 'user',
-    resourceId: params.id,
+    resourceId: id,
     metadata: { new_role: body.role },
   })
 
-  return ok({ id: params.id, role: body.role }, 'Role updated')
+  return ok({ id: id, role: body.role }, 'Role updated')
 }
 
 // DELETE /api/team/[id] — remove team member
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -82,7 +84,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { data: target } = await supabase
     .from('users')
     .select('role')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -95,7 +97,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   await supabase
     .from('users')
     .update({ tenant_id: null })
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
 
   await auditLog(supabase, {
@@ -103,11 +105,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     actorId: userId,
     action: 'team.member_removed',
     resourceType: 'user',
-    resourceId: params.id,
+    resourceId: id,
   })
 
   // Suppress unused var warning
   void admin
 
-  return ok({ id: params.id }, 'Member removed')
+  return ok({ id: id }, 'Member removed')
 }

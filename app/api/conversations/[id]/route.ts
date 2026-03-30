@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err } from '@/lib/api'
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 // PATCH /api/conversations/[id] — update status (resolve, escalate, etc.)
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { data, error } = await supabase
     .from('conversations')
     .update(updatePayload)
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .select()
     .single()
@@ -40,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     actorId: userId,
     action: `conversation.${body.status ?? 'updated'}`,
     resourceType: 'conversation',
-    resourceId: params.id,
+    resourceId: id,
     metadata: { status: body.status },
   })
 

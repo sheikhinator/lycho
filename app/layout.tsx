@@ -1,14 +1,9 @@
 import type { Metadata } from 'next'
-import dynamic from 'next/dynamic'
 import { Bebas_Neue, Cormorant_Garamond, DM_Sans, DM_Mono } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { ToastProvider } from '@/components/providers/ToastProvider'
+import { CustomCursorLoader } from '@/components/ui/CustomCursorLoader'
 import './globals.css'
-
-const CustomCursor = dynamic(
-  () => import('@/components/ui/CustomCursor').then(m => m.CustomCursor),
-  { ssr: false }
-)
 
 const bebasNeue = Bebas_Neue({
   weight: '400',
@@ -52,7 +47,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ToastProvider>
-            <CustomCursor />
+            <CustomCursorLoader />
             {children}
           </ToastProvider>
         </AuthProvider>

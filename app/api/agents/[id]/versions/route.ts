@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { getAuthContext, ok, err } from '@/lib/api'
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 // GET /api/agents/[id]/versions — list all version history for an agent
 export async function GET(_req: NextRequest, { params }: Params) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant found', 'NO_TENANT', 403)
@@ -15,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { error: agentError } = await supabase
     .from('agents')
     .select('id')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { data, error } = await supabase
     .from('agent_versions')
     .select('id, version, changed_by, change_reason, created_at')
-    .eq('agent_id', params.id)
+    .eq('agent_id', id)
     .eq('tenant_id', tenantId)
     .order('version', { ascending: false })
 

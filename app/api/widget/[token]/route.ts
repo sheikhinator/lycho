@@ -6,14 +6,15 @@ import { ok, err } from '@/lib/api'
 // Returns enough info for the widget to render
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ) {
+  const { token } = await params
   const supabase = createAdminClient()
 
   const { data: agent, error } = await supabase
     .from('agents')
     .select('id, display_name, agent_type, tenant_id')
-    .eq('widget_token', params.token)
+    .eq('widget_token', token)
     .neq('status', 'deleted')
     .single()
 

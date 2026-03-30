@@ -4,8 +4,9 @@ import { getAuthContext, ok, err } from '@/lib/api'
 // POST /api/automations/[id]/toggle — active ↔ paused
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params
   const ctx = await getAuthContext()
   if (!ctx) return err('Unauthorized', 'UNAUTHORIZED', 401)
   if (!ctx.tenantId) return err('No tenant', 'NO_TENANT', 403)
@@ -14,7 +15,7 @@ export async function POST(
   const { data: existing } = await supabase
     .from('automations')
     .select('status')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
@@ -25,7 +26,7 @@ export async function POST(
   const { data, error } = await supabase
     .from('automations')
     .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('tenant_id', tenantId)
     .select('id, status')
     .single()
