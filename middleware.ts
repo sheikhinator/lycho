@@ -6,7 +6,7 @@ const PROTECTED = ['/dashboard', '/agents', '/conversations', '/billing', '/sett
 
 // Public routes — skip Supabase session check entirely
 // /master handles its own auth via master_session cookie in app/master/layout.tsx
-const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components', '/master', '/demo']
+const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components', '/master', '/master-login', '/demo']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

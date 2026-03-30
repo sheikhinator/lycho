@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 
 // ─── LYCHO Master Login ────────────────────────────────────────────────────────
+// Lives outside /master layout to avoid redirect loops
 export default function MasterLoginPage() {
-  const router = useRouter()
-  const [secret, setSecret] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -15,13 +14,13 @@ export default function MasterLoginPage() {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/master/auth/login', {
+      const res = await fetch('/api/master/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret }),
+        body: JSON.stringify({ password }),
       })
       if (res.ok) {
-        router.replace('/master')
+        window.location.href = '/master'
       } else {
         const json = await res.json().catch(() => ({}))
         setError(json.error ?? 'Invalid master secret')
@@ -77,8 +76,8 @@ export default function MasterLoginPage() {
           </label>
           <input
             type="password"
-            value={secret}
-            onChange={e => setSecret(e.target.value)}
+            value={password}
+            onChange={e => setPassword(e.target.value)}
             placeholder="Enter master secret"
             required
             autoFocus
@@ -114,7 +113,7 @@ export default function MasterLoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !secret}
+            disabled={loading || !password}
             style={{
               marginTop: 24,
               width: '100%',

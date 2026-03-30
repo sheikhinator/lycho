@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 
@@ -10,19 +11,12 @@ const NAV = [
   { label: 'System',      href: '/master/system' },
 ]
 
-// Server component — guard: master_session cookie must exist.
-// When no session is present, children render bare (no sidebar, no redirect).
-// This covers /master/login without causing an infinite redirect loop.
-// Authenticated pages redirect to /master/login via their own logic or this layout.
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies()
   const session = cookieStore.get('master_session')
 
-  // No valid session → render children bare (no sidebar).
-  // Covers /master/login without an infinite redirect loop.
-  // Other master pages show no data since their API calls require MASTER_SECRET.
-  if (!session?.value) {
-    return <>{children}</>
+  if (!session?.value || session.value !== process.env.MASTER_SECRET) {
+    redirect('/master-login')
   }
 
   return (
