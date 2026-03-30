@@ -43,9 +43,7 @@ export async function sendHotLeadAlert(
       subject: `🔥 HOT LEAD — ${contactIdentifier} scored ${leadScore}/100`,
       html,
     })
-  } catch (err) {
-    console.error('[email-service] sendHotLeadAlert error:', err)
-  }
+  } catch {}
 }
 
 export async function sendEscalationAlert(
@@ -77,9 +75,7 @@ export async function sendEscalationAlert(
       subject: `⚡ Action needed — ${contactIdentifier} needs your attention on ${channel}`,
       html,
     })
-  } catch (err) {
-    console.error('[email-service] sendEscalationAlert error:', err)
-  }
+  } catch {}
 }
 
 export async function sendDailyDigest(
@@ -113,9 +109,7 @@ export async function sendDailyDigest(
       subject: `📊 Your LYCHO Daily Brief — ${date}`,
       html,
     })
-  } catch (err) {
-    console.error('[email-service] sendDailyDigest error:', err)
-  }
+  } catch {}
 }
 
 export async function sendTrialExpiry(
@@ -138,9 +132,7 @@ export async function sendTrialExpiry(
       subject: `Your LYCHO trial expires in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}`,
       html,
     })
-  } catch (err) {
-    console.error('[email-service] sendTrialExpiry error:', err)
-  }
+  } catch {}
 }
 
 export async function sendWeeklyROI(
@@ -183,7 +175,5 @@ export async function sendWeeklyROI(
       subject: `💰 LYCHO delivered PKR ${totalValuePkr.toLocaleString()} in value this week`,
       html,
     })
-  } catch (err) {
-    console.error('[email-service] sendWeeklyROI error:', err)
-  }
+  } catch {}
 }

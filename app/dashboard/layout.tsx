@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase'
 import { SidebarProvider } from '@/components/providers/SidebarContext'
@@ -9,13 +10,31 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const supabase = await createServerSupabase()
-  // Use getUser() for server-validated authentication — not getSession() (cookie-only, no server check)
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) redirect('/login')
 
-  // Update last_login_at on every dashboard load
   const admin = createAdminClient()
+  const headersList = await headers()
+  const currentPath = headersList.get('x-current-path') ?? ''
+
+  const { data: userRow } = await admin
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .single()
+
+  if (userRow?.tenant_id && currentPath !== '/dashboard/activate') {
+    const { data: tenant } = await admin
+      .from('tenants')
+      .select('plan_status')
+      .eq('id', userRow.tenant_id)
+      .single()
+
+    if (tenant?.plan_status === 'pending' || tenant?.plan_status === 'expired') {
+      redirect('/dashboard/activate')
+    }
+  }
+
   await admin
     .from('users')
     .update({ last_login_at: new Date().toISOString() })

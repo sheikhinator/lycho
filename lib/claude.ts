@@ -70,8 +70,7 @@ export async function callClaude({
       model,
       estimatedCostPkr,
     }
-  } catch (error) {
-    console.error('Claude API failed:', error)
+  } catch {
     throw new Error('AI service temporarily unavailable. Please try again.')
   }
 }

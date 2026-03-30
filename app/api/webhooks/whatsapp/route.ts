@@ -42,7 +42,6 @@ export async function GET(request: Request) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN
   // Fail closed — no hardcoded fallback; throw if not configured
   if (!verifyToken) {
-    console.error('[whatsapp webhook] WHATSAPP_VERIFY_TOKEN env var not set')
     return new Response('Service misconfigured', { status: 500 })
   }
 
@@ -224,9 +223,8 @@ export async function POST(request: Request) {
         String(creds.access_token),
       )
     }
-  } catch (error) {
-    // Log error message only — never log the full error object (may contain sensitive data)
-    console.error('[whatsapp webhook] Handler error:', error instanceof Error ? error.message : 'unknown error')
+  } catch {
+    // Errors are non-fatal — response is returned below
   }
 
   return Response.json({ ok: true })

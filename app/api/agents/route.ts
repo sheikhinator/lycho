@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { sanitiseInput } from '@/lib/sanitise'
+import { canDeployAgent } from '@/lib/plan-limits'
 
 // GET /api/agents — list all agents for the authenticated tenant
 export async function GET() {
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (!body.agent_type) return err('agent_type is required', 'VALIDATION_ERROR', 400)
+
+  // Check plan limits before creating
+  const { data: tenant } = await supabase.from('tenants').select('plan_status').eq('id', tenantId).single()
+  const { count: agentCount } = await supabase.from('agents').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).neq('status', 'deleted')
+  const planStatus = tenant?.plan_status ?? 'pending'
+  if (!canDeployAgent(planStatus, agentCount ?? 0)) {
+    return err('Agent limit reached. Upgrade your plan to deploy more agents.', 'PLAN_LIMIT', 403)
+  }
 
   if (body.display_name) {
     const s = sanitiseInput(body.display_name)

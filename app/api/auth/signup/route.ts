@@ -1,20 +1,42 @@
 import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import { rateGuard, AUTH_LIMITS } from '@/lib/api'
+import { Redis } from '@upstash/redis'
+
+function getIp(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  )
+}
+
+async function checkSignupRateLimit(ip: string): Promise<boolean> {
+  const url   = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return false
+  const redis = new Redis({ url, token })
+  const key   = `signup:ip:${ip}`
+  try {
+    const count = await redis.incr(key)
+    if (count === 1) await redis.expire(key, 3600)
+    return count > 3
+  } catch {
+    return false
+  }
+}
 
 export async function POST(request: NextRequest) {
-  // Rate-limit signup attempts — prevent account enumeration and bulk creation
-  const limited = await rateGuard(request, AUTH_LIMITS)
-  if (limited) return limited
+  const ip = getIp(request)
+  if (await checkSignupRateLimit(ip)) {
+    return NextResponse.json({ error: 'Too many signup attempts. Please try again later.' }, { status: 429 })
+  }
 
   const { businessName, email, password, phone, sector, country } = await request.json()
 
   if (!businessName || !email || !password) {
     return NextResponse.json({ error: 'Business name, email and password are required.' }, { status: 400 })
   }
-
-  // Basic input validation
   if (typeof email !== 'string' || !email.includes('@')) {
     return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 })
   }
@@ -22,13 +44,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
   }
 
-  // Use the anon client for signUp so Supabase triggers the verification email
+  const admin = createAdminClient()
+
+  // Max 1 account per email ever
+  const { data: existing } = await admin
+    .from('tenants')
+    .select('id')
+    .eq('business_email', email.toLowerCase())
+    .maybeSingle()
+
+  if (existing) {
+    return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 400 })
+  }
+
   const anonClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  // Allow only same-origin redirects to prevent open-redirect abuse
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').split(',')
   const requestOrigin  = request.headers.get('origin') ?? ''
   const redirectOrigin = allowedOrigins.some(o => requestOrigin.startsWith(o.trim()))
@@ -42,7 +75,6 @@ export async function POST(request: NextRequest) {
   })
 
   if (authError) {
-    // Return a generic error — don't reveal whether the email already exists
     return NextResponse.json({ error: 'Signup failed. Please check your details and try again.' }, { status: 400 })
   }
 
@@ -51,20 +83,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Signup failed — please try again.' }, { status: 400 })
   }
 
-  const admin = createAdminClient()
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-
-  // Create tenant
   const { data: tenant, error: tenantError } = await admin
     .from('tenants')
     .insert({
       business_name:  String(businessName).slice(0, 200),
       business_email: email,
-      business_phone: phone  ? String(phone).slice(0, 30)  : null,
-      sector:         sector ? String(sector).slice(0, 100) : null,
+      business_phone: phone   ? String(phone).slice(0, 30)   : null,
+      sector:         sector  ? String(sector).slice(0, 100)  : null,
       country:        country === 'PK' ? 'PK' : 'US',
       currency:       country === 'PK' ? 'PKR' : 'USD',
-      trial_ends_at:  trialEndsAt,
+      plan_status:    'pending',
     })
     .select()
     .single()
@@ -74,7 +102,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 })
   }
 
-  // Create user profile
   const { error: userError } = await admin.from('users').insert({
     id:        userId,
     tenant_id: tenant.id,

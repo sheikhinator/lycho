@@ -22,9 +22,13 @@ export async function GET(
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('business_name, sector')
+    .select('business_name, sector, plan_status')
     .eq('id', agent.tenant_id)
     .single()
+
+  if (tenant?.plan_status === 'pending' || tenant?.plan_status === 'expired') {
+    return err('Widget unavailable — account not active', 'PLAN_REQUIRED', 403)
+  }
 
   return ok({
     agent_id:      agent.id,

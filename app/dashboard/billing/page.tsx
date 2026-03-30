@@ -4,6 +4,21 @@ import { useState } from 'react'
 import { Check, FileText, Download, ChevronRight } from 'lucide-react'
 import { useToast } from '@/components/providers/ToastProvider'
 
+async function postCheckout(plan: string, billing_cycle: string): Promise<{ mock?: boolean; checkout_url?: string; message?: string } | null> {
+  try {
+    const res = await fetch('/api/payments/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, billing_cycle, provider: 'safepay', currency: 'PKR' }),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return json?.data ?? null
+  } catch {
+    return null
+  }
+}
+
 interface Plan {
   id: string
   name: string
@@ -101,8 +116,31 @@ function fmt(n: number) {
 
 export default function BillingPage() {
   const [annual, setAnnual] = useState(false)
+  const [upgrading, setUpgrading] = useState<string | null>(null)
   const { toast } = useToast()
   const currentPlan = 'starter'
+  const billing_cycle = annual ? 'annual' : 'monthly'
+
+  async function handleUpgrade(planId: string) {
+    if (planId === currentPlan || planId === 'enterprise') return
+    setUpgrading(planId)
+    try {
+      const result = await postCheckout(planId, billing_cycle)
+      if (!result) {
+        toast('Something went wrong. Please try again.', 'error')
+        return
+      }
+      if (result.mock) {
+        toast('Payment coming soon. Email hello@lycho.app to upgrade early.', 'info')
+        return
+      }
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url
+      }
+    } finally {
+      setUpgrading(null)
+    }
+  }
 
   function handlePlanAction(plan: Plan) {
     if (plan.id === currentPlan) return
@@ -110,7 +148,7 @@ export default function BillingPage() {
       toast('Redirecting to sales — our team will be in touch.', 'info')
       return
     }
-    toast(`Upgrade to ${plan.name} coming soon.`, 'info')
+    handleUpgrade(plan.id)
   }
 
   return (
@@ -229,7 +267,7 @@ export default function BillingPage() {
               </ul>
 
               <button
-                className="w-full py-2.5 rounded-lg text-xs font-sans font-medium transition-opacity"
+                className="w-full py-2.5 rounded-lg text-xs font-sans font-medium transition-opacity disabled:opacity-50"
                 style={
                   isCurrent
                     ? { background: 'rgba(201,168,76,0.1)', color: '#C9A84C', cursor: 'default' }
@@ -238,9 +276,9 @@ export default function BillingPage() {
                       : { background: '#1c1c1c', color: '#F0EBE1', border: '1px solid #2a2a2a' }
                 }
                 onClick={() => handlePlanAction(plan)}
-                disabled={isCurrent}
+                disabled={isCurrent || upgrading === plan.id}
               >
-                {isCurrent ? 'Current Plan' : plan.cta}
+                {isCurrent ? 'Current Plan' : upgrading === plan.id ? 'Loading…' : plan.cta}
               </button>
             </div>
           )

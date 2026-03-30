@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
+import { canReceiveMessage } from '@/lib/plan-limits'
 import { sanitiseInput } from '@/lib/sanitise'
 import { callClaude, getModel } from '@/lib/claude'
 import { buildIntakeSystemPrompt, type ContactProfile } from '@/lib/agents/intake-agent'
@@ -140,6 +141,17 @@ export async function POST(req: NextRequest) {
 
   if (!tenant) return err('Tenant not found', 'NOT_FOUND', 404)
 
+  // Plan check
+  const planStatus = (tenant.plan_status as string) ?? 'pending'
+  if (planStatus === 'pending' || planStatus === 'expired') {
+    return err('Active plan required. Please activate your account.', 'PLAN_REQUIRED', 403)
+  }
+  const { data: agentRows } = await supabase.from('agents').select('interactions_count').eq('tenant_id', tenantId)
+  const totalInteractions = (agentRows ?? []).reduce((s, a) => s + ((a.interactions_count as number) || 0), 0)
+  if (!canReceiveMessage(planStatus, totalInteractions)) {
+    return err('Interaction limit reached. Upgrade your plan to continue.', 'PLAN_LIMIT', 403)
+  }
+
   // 3. Get or create conversation
   let conversation: Record<string, unknown> | null = null
 
@@ -235,7 +247,6 @@ export async function POST(req: NextRequest) {
       useCache: true,
     })
   } catch (e) {
-    console.error('[conversations POST] Claude API error:', e)
     return err('AI service temporarily unavailable. Please try again.', 'AI_ERROR', 503)
   }
 
@@ -381,6 +392,14 @@ export async function POST(req: NextRequest) {
       ...triggerBase,
       reason: metadata?.suggested_next_action ?? 'Human intervention required',
     }, supabase)
+  }
+
+  const sentiment = metadata?.sentiment ?? 'neutral'
+  if (sentiment === 'frustrated') {
+    void dispatchTrigger(tenantId, 'sentiment.frustrated', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
+  }
+  if (sentiment === 'excited') {
+    void dispatchTrigger(tenantId, 'sentiment.excited', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
   }
 
   // 14. Message audit log

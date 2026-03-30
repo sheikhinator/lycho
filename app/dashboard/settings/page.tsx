@@ -458,9 +458,8 @@ function TelegramConnectCard({ tenantId }: { tenantId: string }) {
       setBotUsername(username)
       setConnected(true)
       toast(`Telegram bot @${username} connected!`, 'success')
-    } catch (e) {
+    } catch {
       toast('Failed to connect bot — please try again', 'error')
-      console.error(e)
     } finally {
       setConnecting(false)
     }

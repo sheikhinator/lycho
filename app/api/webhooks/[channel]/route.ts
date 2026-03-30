@@ -80,7 +80,6 @@ export async function GET(
   // Fail closed — no hardcoded fallback; if env var is absent the endpoint is misconfigured
   const verifyToken = process.env.WEBHOOK_VERIFY_TOKEN
   if (!verifyToken) {
-    console.error('[webhook GET] WEBHOOK_VERIFY_TOKEN env var not set')
     return new NextResponse('Service misconfigured', { status: 500 })
   }
 

@@ -5,16 +5,23 @@ import type { NextRequest } from 'next/server'
 const PROTECTED = ['/dashboard', '/agents', '/conversations', '/billing', '/settings', '/onboarding']
 
 // Public routes — skip Supabase session check entirely
-const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components']
+// /master handles its own auth via master_session cookie in app/master/layout.tsx
+const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components', '/master', '/demo']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip session check for explicitly public routes
   const isPublic = PUBLIC.some(p => pathname === p || pathname.startsWith(p + '/'))
-  if (isPublic) return NextResponse.next({ request: { headers: request.headers } })
+  if (isPublic) {
+    const h = new Headers(request.headers)
+    h.set('x-current-path', pathname)
+    return NextResponse.next({ request: { headers: h } })
+  }
 
-  const response = NextResponse.next({ request: { headers: request.headers } })
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-current-path', pathname)
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

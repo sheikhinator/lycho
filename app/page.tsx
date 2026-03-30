@@ -96,7 +96,7 @@ function Nav() {
             className="text-sm font-sans font-medium px-5 py-2 rounded-lg transition-opacity hover:opacity-85"
             style={{ background: '#C9A84C', color: '#070707' }}
           >
-            Start Free Trial
+            Start 7-Day Trial — PKR 999
           </Link>
         </div>
 
@@ -130,7 +130,7 @@ function Nav() {
           ))}
           <div className="flex flex-col gap-2 pt-2">
             <Link href="/login" className="text-sm font-sans py-2.5 text-center rounded-lg" style={{ color: '#6b6b6b', border: '1px solid #2a2a2a' }} onClick={() => setOpen(false)}>Sign In</Link>
-            <Link href="/signup" className="text-sm font-sans font-medium py-2.5 text-center rounded-lg" style={{ background: '#C9A84C', color: '#070707' }} onClick={() => setOpen(false)}>Start Free Trial</Link>
+            <Link href="/signup" className="text-sm font-sans font-medium py-2.5 text-center rounded-lg" style={{ background: '#C9A84C', color: '#070707' }} onClick={() => setOpen(false)}>Start 7-Day Trial — PKR 999</Link>
           </div>
         </div>
       )}
@@ -312,18 +312,18 @@ export default function Home() {
                 className="flex items-center gap-2 px-8 py-4 rounded-xl font-sans font-semibold text-sm transition-all hover:opacity-90 hover:scale-105"
                 style={{ background: '#C9A84C', color: '#070707' }}
               >
-                Start Free Trial <span style={{ opacity: 0.7, fontSize: '0.75rem' }}>— 14 days free</span>
+                Start 7-Day Trial — PKR 999
                 <ArrowRight size={16} />
               </Link>
-              <a
-                href="#how-it-works"
+              <Link
+                href="/demo"
                 className="flex items-center gap-2 px-8 py-4 rounded-xl font-sans text-sm transition-colors"
                 style={{ border: '1px solid #2a2a2a', color: '#6b6b6b' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#C9A84C'; (e.currentTarget as HTMLElement).style.color = '#C9A84C' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a'; (e.currentTarget as HTMLElement).style.color = '#6b6b6b' }}
               >
-                See How It Works
-              </a>
+                Live Demo — No Signup Required
+              </Link>
             </div>
           </div>
 
@@ -342,7 +342,7 @@ export default function Home() {
               { num: '70+',     label: 'AI Agents Ready to Deploy' },
               { num: '47',      label: 'Surfaces. WhatsApp to Voice.' },
               { num: '24/7',    label: 'Always On. Never Tired.' },
-              { num: '14 Days', label: 'Free Trial. No Card.' },
+              { num: '7 Days', label: 'Trial from PKR 999.' },
             ].map(s => (
               <div key={s.num} className="text-center">
                 <p className="font-bebas" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', color: '#C9A84C', letterSpacing: '0.04em', lineHeight: 1 }}>{s.num}</p>
@@ -458,7 +458,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { n: '01', title: 'Sign up in 2 minutes',           body: 'No credit card required. Start your 14-day free trial instantly.' },
+                { n: '01', title: 'Sign up in 2 minutes',           body: 'PKR 999 — fully refunded if cancelled. Start your 7-day trial instantly.' },
                 { n: '02', title: 'Deploy your first agent in 5 minutes', body: 'Choose from 500+ specialist agents. One click to deploy.' },
                 { n: '03', title: 'Connect WhatsApp in 5 minutes',  body: 'Just your phone number. No API registration. Just connect.' },
                 { n: '04', title: 'Your business never sleeps again', body: 'From minute 14 onwards — every customer gets an instant, intelligent response.' },
@@ -518,19 +518,29 @@ export default function Home() {
                     </span>
                     {plan.id !== 'enterprise' && <span className="text-xs font-sans ml-1" style={{ color: '#6b6b6b' }}>/mo</span>}
                   </div>
+                  <p className="text-xs font-sans mb-3" style={{ color: '#6b6b6b' }}>
+                    {plan.id === 'enterprise' ? '7-day trial PKR 999 then custom pricing' : `7-day trial PKR 999 then PKR ${(annual ? plan.priceA : plan.priceM).toLocaleString('en-PK')}/mo`}
+                  </p>
                   <Link
                     href="/signup"
                     className="mt-auto w-full py-2.5 rounded-lg text-xs font-sans font-medium text-center transition-opacity hover:opacity-80 block"
                     style={plan.highlight ? { background: '#C9A84C', color: '#070707' } : { background: '#1c1c1c', color: '#F0EBE1', border: '1px solid #2a2a2a' }}
                   >
-                    Start Free Trial
+                    Start 7-Day Trial — PKR 999
+                  </Link>
+                  <Link
+                    href="/demo"
+                    className="mt-2 w-full py-2 rounded-lg text-xs font-sans text-center transition-colors block"
+                    style={{ border: '1px solid #2a2a2a', color: '#6b6b6b' }}
+                  >
+                    Live Demo — No Signup Required
                   </Link>
                 </div>
               ))}
             </div>
 
             <p className="text-center text-xs font-sans" style={{ color: '#6b6b6b' }}>
-              All plans include 14-day free trial. No credit card required.
+              All plans include a 7-day trial — PKR 999, fully refunded if cancelled within 7 days.
             </p>
           </div>
         </section>
