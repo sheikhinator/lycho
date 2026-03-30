@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Bot, Zap, MessageSquare,
+  LayoutDashboard, Bot, Play, MessageSquare, Zap,
   Store, CreditCard, Settings, Code2,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
@@ -12,8 +12,9 @@ import { useSidebar } from '@/components/providers/SidebarContext'
 const NAV = [
   { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard'               },
   { icon: Bot,             label: 'Agents',        href: '/dashboard/agents'        },
-  { icon: Zap,             label: 'Test Agents',   href: '/dashboard/chat'          },
+  { icon: Play,            label: 'Test Agents',   href: '/dashboard/chat'          },
   { icon: MessageSquare,   label: 'Conversations', href: '/dashboard/conversations' },
+  { icon: Zap,             label: 'Nexus',         href: '/dashboard/nexus'         },
   { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'   },
   { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'       },
   { icon: Settings,        label: 'Settings',      href: '/dashboard/settings'      },

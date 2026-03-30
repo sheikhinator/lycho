@@ -14,6 +14,7 @@ import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
 import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
 import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
+import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 
 // ─── Agent routing helpers ────────────────────────────────────────────────────
 
@@ -356,6 +357,30 @@ export async function POST(req: NextRequest) {
       metadata?.suggested_next_action ?? 'Conversation requires human intervention',
       updatedMessages.slice(-4),
     )
+  }
+
+  // 13b. Nexus trigger dispatches (fire-and-forget)
+  const triggerBase = {
+    conversation_id:    conversation!.id as string,
+    agent_id:           body.agent_id,
+    channel:            body.channel,
+    contact_identifier: body.contact_identifier,
+    lead_score:         leadScore,
+    sentiment:          metadata?.sentiment ?? 'neutral',
+    dashboard_url:      `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/conversations`,
+  }
+
+  void dispatchTrigger(tenantId, 'conversation.message', triggerBase, supabase)
+
+  if (isNewHotLead) {
+    void dispatchTrigger(tenantId, 'lead.hot_detected', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
+  }
+
+  if (escalated && conversation!.status !== 'escalated') {
+    void dispatchTrigger(tenantId, 'conversation.escalated', {
+      ...triggerBase,
+      reason: metadata?.suggested_next_action ?? 'Human intervention required',
+    }, supabase)
   }
 
   // 14. Message audit log
