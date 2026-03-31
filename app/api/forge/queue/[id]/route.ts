@@ -68,32 +68,28 @@ export async function PUT(
 
   if (queueErr) return err(queueErr.message, 'DB_ERROR', 500)
 
-  // Insert into agents table as a catalogue entry (no tenant — globally available)
+  // Insert into marketplace_agents so it appears in marketplace and routes conversations
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: agent, error: agentErr } = await (adminClient as any)
-    .from('agents')
-    .insert({
-      tenant_id:    null,
-      agent_type:   entry.agent_type,
-      display_name: entry.display_name,
-      channels:     entry.recommended_channels ?? [],
-      config: {
-        system_prompt:       entry.system_prompt,
-        model_complexity:    entry.model_complexity,
-        estimated_value_pkr: entry.estimated_value_pkr,
-        sector_tags:         entry.sector_tags,
-        use_case_examples:   entry.use_case_examples,
-        why_novel:           entry.why_novel,
-        source:              'forge',
-      },
-      status:  'active',
-      version: 1,
-    })
-    .select()
-    .single()
+  const { error: marketplaceErr } = await (adminClient as any)
+    .from('marketplace_agents')
+    .upsert({
+      agent_type:           entry.agent_type,
+      display_name:         entry.display_name,
+      description:          entry.description,
+      system_prompt:        entry.system_prompt,
+      recommended_channels: entry.recommended_channels ?? [],
+      model_complexity:     entry.model_complexity ?? 'simple',
+      estimated_value_pkr:  entry.estimated_value_pkr ?? 0,
+      sector_tags:          entry.sector_tags ?? [],
+      use_case_examples:    entry.use_case_examples ?? [],
+      source:               'forge',
+      status:               'active',
+      created_at:           now,
+    }, { onConflict: 'agent_type' })
 
-  if (agentErr) {
-    // Don't fail the whole request — queue is already updated
+  if (marketplaceErr) {
+    console.error('marketplace_agents insert error:', marketplaceErr)
+    // Don't fail — queue is already marked approved
   }
 
   // Send confirmation email to master
@@ -111,5 +107,5 @@ ${body.notes ? `<p><strong>Your notes:</strong> ${body.notes}</p>` : ''}
     }).catch(() => {})
   }
 
-  return ok({ status: 'approved', agent: agent ?? null }, 'Agent approved and deployed')
+  return ok({ status: 'approved' }, 'Agent approved and deployed')
 }

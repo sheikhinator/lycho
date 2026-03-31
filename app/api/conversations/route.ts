@@ -230,12 +230,28 @@ export async function POST(req: NextRequest) {
     extraContext += `EMOTIONAL CONTEXT: Customer appears ${emotion.state} (intensity: ${emotion.intensity.toFixed(1)}). Tone: ${emotion.recommended_tone}. Start with: "${emotion.opening_acknowledgement}"\n\n`
   }
 
-  const basePrompt = getSystemPrompt(agent.agent_type, tenant, agent, hasProfile ? existingProfile : null)
+  let basePrompt = getSystemPrompt(agent.agent_type, tenant, agent, hasProfile ? existingProfile : null)
+  let model = getModel(getAgentComplexity(agent.agent_type))
+
+  // For non-core agents, look up system_prompt from marketplace_agents
+  const CORE_TYPES = ['intake', 'research', 'operations', 'client', 'analyst', 'compliance', 'content']
+  if (!CORE_TYPES.includes(normaliseType(agent.agent_type))) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: mAgent } = await (supabase as any)
+      .from('marketplace_agents')
+      .select('system_prompt, model_complexity')
+      .eq('agent_type', agent.agent_type)
+      .single()
+    if (mAgent?.system_prompt) {
+      basePrompt = mAgent.system_prompt as string
+      model = getModel(mAgent.model_complexity as 'simple' | 'complex')
+    }
+  }
+
   const systemPrompt = extraContext ? `${basePrompt}\n\n${extraContext}` : basePrompt
 
   // 6. Call Claude — complex agents use Sonnet, simple use Haiku
   const complexity = getAgentComplexity(agent.agent_type)
-  const model = getModel(complexity)
   const maxTokens = complexity === 'complex' ? 900 : 600
   let claudeResult
   try {

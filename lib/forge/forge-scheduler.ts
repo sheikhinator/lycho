@@ -1,4 +1,5 @@
 import { callClaude, MODELS } from '@/lib/claude'
+import { createAdminClient } from '@/lib/supabase'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -18,8 +19,9 @@ interface ForgedAgent {
   why_novel: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function runAutonomousForge(supabase: any): Promise<{ agents_queued: number }> {
+export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createAdminClient() as any
   // 1. Get types already in the forge_queue (not rejected) — only source of truth for dedup
   const { data: queueRows } = await supabase
     .from('forge_queue')

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-const SECTIONS = ['dashboard', 'tenants', 'forge', 'waitlist'] as const
+const SECTIONS = ['dashboard', 'tenants', 'forge', 'payments', 'waitlist'] as const
 type Section = typeof SECTIONS[number]
 
 export default function MasterPanel() {
@@ -50,18 +50,24 @@ export default function MasterPanel() {
         method: 'POST',
         headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
       })
-      const json = await res.json()
+      const text = await res.text()
+      if (!text) { setForgeResult('❌ Empty response'); setForgeLoading(false); return }
+      const json = JSON.parse(text)
       if (res.ok) {
-        const queued = json.data?.agents_queued ?? json.agents_queued ?? 0
-        setForgeResult(`✅ Success — ${queued} agents queued`)
-        loadSection('forge')
+        setForgeResult('⏳ Forge is running... agents will appear in queue within 30 seconds')
+        setTimeout(() => {
+          loadSection('forge')
+          setForgeResult('✅ Done — check queue below')
+          setForgeLoading(false)
+        }, 35000)
       } else {
-        setForgeResult(`❌ Error: ${json.error || json.message || res.status}`)
+        setForgeResult(`❌ Error: ${json.error}`)
+        setForgeLoading(false)
       }
     } catch(e: any) {
       setForgeResult(`❌ Failed: ${e.message}`)
+      setForgeLoading(false)
     }
-    setForgeLoading(false)
   }
 
   useEffect(() => { if (authed) loadSection('dashboard') }, [authed])
@@ -101,7 +107,7 @@ export default function MasterPanel() {
             style={{padding:'10px 20px',cursor:'pointer',background:section===s?'rgba(201,168,76,0.08)':'transparent',
               borderLeft:section===s?'2px solid #C9A84C':'2px solid transparent',
               color:section===s?'#C9A84C':'#666',fontSize:13,textTransform:'capitalize',transition:'all 0.2s'}}>
-            {s === 'forge' ? 'Forge Queue' : s.charAt(0).toUpperCase()+s.slice(1)}
+            {s === 'forge' ? 'Forge Queue' : s === 'payments' ? 'Payments' : s.charAt(0).toUpperCase()+s.slice(1)}
           </div>
         ))}
         <div style={{padding:'10px 20px',marginTop:16,borderTop:'1px solid #1a1a1a'}}>
@@ -218,6 +224,40 @@ export default function MasterPanel() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            {section === 'payments' && (
+              <div>
+                <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,marginBottom:24,letterSpacing:1}}>PAYMENTS</h2>
+                {(data.payments||[]).length===0 && <p style={{color:'#444'}}>No payment requests yet.</p>}
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr>{['Business','Plan','Amount (PKR)','Method','Transaction ID','Status','Date','Action'].map(h=>(
+                    <th key={h} style={{textAlign:'left',padding:'8px 12px',color:'#444',fontSize:11,borderBottom:'1px solid #1a1a1a'}}>{h}</th>
+                  ))}</tr></thead>
+                  <tbody>{(data.payments||[]).map((p:any)=>(
+                    <tr key={p.id} style={{borderBottom:'1px solid #111',background:p.status==='pending'?'rgba(201,168,76,0.04)':'transparent'}}>
+                      <td style={{padding:'10px 12px',fontSize:13}}>{p.tenants?.business_name||'-'}<br/><span style={{color:'#444',fontSize:11}}>{p.tenants?.business_email||'-'}</span></td>
+                      <td style={{padding:'10px 12px',fontSize:13,color:'#C9A84C'}}>{p.plan}</td>
+                      <td style={{padding:'10px 12px',fontSize:13}}>{(p.amount_pkr||0).toLocaleString()}</td>
+                      <td style={{padding:'10px 12px',fontSize:13,color:'#888'}}>{p.payment_method}</td>
+                      <td style={{padding:'10px 12px',fontSize:11,color:'#666',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>{p.transaction_id||'-'}</td>
+                      <td style={{padding:'10px 12px'}}>
+                        <span style={{background:p.status==='approved'?'#064e3b':p.status==='pending'?'rgba(201,168,76,0.15)':'#1a1a1a',color:p.status==='approved'?'#34d399':p.status==='pending'?'#C9A84C':'#666',padding:'2px 8px',borderRadius:4,fontSize:11}}>{p.status}</span>
+                      </td>
+                      <td style={{padding:'10px 12px',fontSize:11,color:'#444'}}>{new Date(p.created_at).toLocaleDateString()}</td>
+                      <td style={{padding:'10px 12px'}}>
+                        {p.status==='pending' && (
+                          <button onClick={async()=>{
+                            await fetch('/api/master/activate',{method:'POST',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({tenant_id:p.tenant_id,plan:p.plan,billing_cycle:p.billing_cycle,payment_request_id:p.id})})
+                            loadSection('payments')
+                          }} style={{background:'#064e3b',color:'#34d399',border:'1px solid #065f46',borderRadius:6,padding:'4px 12px',fontSize:12,cursor:'pointer',fontWeight:600}}>
+                            ✅ Activate
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
               </div>
             )}
             {section === 'waitlist' && (

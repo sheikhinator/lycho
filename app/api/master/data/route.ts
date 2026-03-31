@@ -44,5 +44,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ waitlist: data || [] })
   }
 
+  if (section === 'payments') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
+      .from('payment_requests')
+      .select('*, tenants(business_name, business_email)')
+      .order('created_at', { ascending: false })
+    return NextResponse.json({ payments: data || [] })
+  }
+
   return NextResponse.json({})
 }

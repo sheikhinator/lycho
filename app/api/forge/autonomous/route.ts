@@ -1,34 +1,32 @@
-import { NextRequest } from 'next/server'
-import { ok, err, rateGuard, AUTH_LIMITS } from '@/lib/api'
-import { createAdminClient } from '@/lib/supabase'
+import { NextResponse } from 'next/server'
 import { runAutonomousForge } from '@/lib/forge/forge-scheduler'
 
-function checkMasterSecret(req: NextRequest): boolean {
+export const dynamic = 'force-dynamic'
+
+function checkSecret(request: Request): boolean {
   const secret = process.env.MASTER_SECRET
   if (!secret) return false
-  return req.headers.get('x-master-secret') === secret
+  return request.headers.get('x-master-secret') === secret
 }
 
-// GET /api/forge/autonomous — Vercel cron job endpoint
-export async function GET(req: NextRequest) {
-  const rl = await rateGuard(req, AUTH_LIMITS)
-  if (rl) return rl
-
-  if (!checkMasterSecret(req)) return err('Forbidden', 'FORBIDDEN', 403)
-
-  const adminClient = createAdminClient()
-  const result = await runAutonomousForge(adminClient)
-  return ok(result, `Forge run complete — ${result.agents_queued} agent(s) queued`)
+// POST — manual trigger from Master Panel (fire and forget)
+export async function POST(request: Request) {
+  if (!checkSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  runAutonomousForge().catch(e => console.error('Forge background error:', e))
+  return NextResponse.json({
+    success: true,
+    message: 'Forge is running in background. Check queue in 30 seconds.',
+    agents_queued: 'pending',
+  })
 }
 
-// POST /api/forge/autonomous — manual trigger
-export async function POST(req: NextRequest) {
-  const rl = await rateGuard(req, AUTH_LIMITS)
-  if (rl) return rl
-
-  if (!checkMasterSecret(req)) return err('Forbidden', 'FORBIDDEN', 403)
-
-  const adminClient = createAdminClient()
-  const result = await runAutonomousForge(adminClient)
-  return ok(result, `Forge run complete — ${result.agents_queued} agent(s) queued`)
+// GET — Vercel cron job endpoint
+export async function GET(request: Request) {
+  if (!checkSecret(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  runAutonomousForge().catch(e => console.error('Forge background error:', e))
+  return NextResponse.json({ success: true, message: 'Forge running in background' })
 }

@@ -20,6 +20,7 @@ type Category = 'all' | 'core' | 'business_suite' | string
 interface FlatAgent extends CatalogueAgent {
   category: string
   categoryLabel: string
+  isNew?: boolean
 }
 
 const SECTOR_LABELS: Record<string, string> = {
@@ -76,17 +77,19 @@ export default function MarketplacePage() {
   const [deployedTypes, setDeployedTypes] = useState<Set<string>>(new Set())
   const [modalOpen, setModalOpen]   = useState(false)
   const [tenantSector, setTenantSector] = useState<string | null>(null)
+  const [dbAgents, setDbAgents]     = useState<FlatAgent[]>([])
   const supabase = createClientSupabase()
 
-  // Load deployed agent types + tenant sector
+  // Load deployed agent types + tenant sector + DB marketplace agents
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      const [agentsRes, userRes] = await Promise.all([
+      const [agentsRes, userRes, dbRes] = await Promise.all([
         supabase.from('agents').select('agent_type').neq('status', 'deleted'),
         supabase.from('users').select('tenants(sector)').eq('id', session.user.id).single(),
+        fetch('/api/marketplace/agents').then(r => r.json()).catch(() => ({ data: { agents: [] } })),
       ])
 
       if (agentsRes.data) {
@@ -96,19 +99,40 @@ export default function MarketplacePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenant = (userRes.data as any)?.tenants
       if (tenant?.sector) setTenantSector(tenant.sector)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawDbAgents: any[] = dbRes?.data?.agents ?? []
+      const mapped: FlatAgent[] = rawDbAgents.map(a => ({
+        type:          a.agent_type as string,
+        name:          a.display_name as string,
+        description:   a.description as string,
+        icon:          'Bot',
+        status:        'available' as const,
+        category:      (a.sector_tags?.[0] as string) || 'marketplace',
+        categoryLabel: 'Marketplace',
+        isNew:         true,
+      }))
+      setDbAgents(mapped)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Merge static catalogue with DB agents (DB agents first, deduped by type)
+  const allAgents = useMemo(() => {
+    const staticTypes = new Set(ALL_AGENTS.map(a => a.type))
+    const uniqueDb = dbAgents.filter(a => !staticTypes.has(a.type))
+    return [...uniqueDb, ...ALL_AGENTS]
+  }, [dbAgents])
+
   const filtered = useMemo(() => {
-    return ALL_AGENTS.filter(a => {
+    return allAgents.filter(a => {
       const matchCat = category === 'all' || a.category === category
       const matchQ   = !query || a.name.toLowerCase().includes(query.toLowerCase()) ||
                        a.description.toLowerCase().includes(query.toLowerCase())
       return matchCat && matchQ
     })
-  }, [query, category])
+  }, [allAgents, query, category])
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto">
@@ -122,7 +146,7 @@ export default function MarketplacePage() {
           Agent Marketplace
         </h1>
         <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
-          Browse {ALL_AGENTS.length}+ AI agents. Deploy in one click.
+          Browse {allAgents.length}+ AI agents. Deploy in one click.
         </p>
       </div>
 
@@ -204,6 +228,13 @@ export default function MarketplacePage() {
                     >
                       <Check size={10} />
                       Deployed
+                    </span>
+                  ) : agent.isNew ? (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-sans font-semibold"
+                      style={{ background: 'rgba(201,168,76,0.2)', color: '#C9A84C', border: '1px solid rgba(201,168,76,0.4)' }}
+                    >
+                      NEW
                     </span>
                   ) : (
                     <span
