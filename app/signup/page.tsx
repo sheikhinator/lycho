@@ -30,6 +30,7 @@ const selectClass =
 export default function SignupPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   useEffect(() => { document.title = 'Create Account — LYCHO' }, [])
   const [error, setError] = useState('')
@@ -64,7 +65,8 @@ export default function SignupPage() {
         return
       }
 
-      router.push(`/signup/verify?email=${encodeURIComponent(form.email)}`)
+      setSuccess(true)
+      setTimeout(() => router.push('/login?from=signup'), 2000)
     } catch {
       setError('Network error. Please check your connection.')
     } finally {
@@ -153,7 +155,13 @@ export default function SignupPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full mt-2" disabled={loading}>
+            {success && (
+              <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded px-3 py-2 text-center">
+                Account created! Redirecting to sign in...
+              </div>
+            )}
+
+            <Button type="submit" className="w-full mt-2" disabled={loading || success}>
               {loading ? 'Creating account…' : 'Create Account'}
             </Button>
           </form>

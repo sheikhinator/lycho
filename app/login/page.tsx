@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button, Input } from '@/components/ui'
 import { Logo } from '@/components/ui/Logo'
 import { createClientSupabase } from '@/lib/supabase'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromSignup = searchParams.get('from') === 'signup'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ email: '', password: '' })
@@ -54,6 +56,11 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-deep border border-border rounded-xl p-8">
+          {fromSignup && (
+            <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded px-3 py-2 mb-4 text-center">
+              Account created successfully. Please sign in.
+            </div>
+          )}
           <h2 className="font-cormorant text-2xl text-ivory font-medium mb-6">
             Sign in
           </h2>
@@ -110,5 +117,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }
