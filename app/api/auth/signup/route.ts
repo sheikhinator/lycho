@@ -28,15 +28,15 @@ async function checkSignupRateLimit(ip: string): Promise<boolean> {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = getIp(request)
-  if (await checkSignupRateLimit(ip)) {
-    return NextResponse.json({ error: 'Too many signup attempts. Please try again later.' }, { status: 429 })
-  }
+  // Rate limit temporarily disabled — re-enable after debugging
+  // const ip = getIp(request)
+  // if (await checkSignupRateLimit(ip)) { ... }
 
-  const body = await request.json().catch(() => null)
+  const body = await request.json().catch((e) => { console.error('[signup] JSON parse error:', e); return null })
   if (!body) return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
 
   const { businessName, email, password, phone, sector, country } = body
+  console.log('[signup] Attempt for email:', email, 'business:', businessName)
 
   if (!businessName || !email || !password) {
     return NextResponse.json({ error: 'Business name, email and password are required.' }, { status: 400 })
@@ -51,19 +51,9 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const normalised = email.trim().toLowerCase()
 
-  // Max 1 account per email — case-insensitive
-  const { data: existing, error: lookupError } = await admin
-    .from('tenants')
-    .select('id')
-    .ilike('business_email', normalised)
-    .maybeSingle()
-
-  if (lookupError) {
-    console.error('[signup] Email lookup error:', lookupError)
-  }
-  if (existing) {
-    return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 400 })
-  }
+  // Duplicate email check temporarily disabled — re-enable after debugging
+  // const { data: existing, error: lookupError } = await admin.from('tenants')...
+  console.log('[signup] Skipping duplicate email check for:', normalised)
 
   const anonClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

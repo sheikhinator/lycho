@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, Check } from 'lucide-react'
+import Link from 'next/link'
+import { Search, Check, ArrowLeft } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { AGENT_CATALOGUE } from '@/lib/agents-catalogue'
 import type { CatalogueAgent } from '@/lib/agents-catalogue'
@@ -139,6 +140,10 @@ export default function MarketplacePage() {
 
       {/* Header */}
       <div className="mb-8">
+        <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-sans mb-4" style={{ color: '#6b6b6b' }}>
+          <ArrowLeft size={14} />
+          Back
+        </Link>
         <h1
           className="font-bebas tracking-wider mb-1"
           style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: '#F0EBE1', letterSpacing: '0.05em' }}

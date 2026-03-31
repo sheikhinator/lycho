@@ -189,7 +189,7 @@ export function DashboardTopBar({ businessName: bProp, initials: iProp, planStat
                 <button
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-sans transition-colors text-left"
                   style={{ color: '#6b6b6b' }}
-                  onClick={() => { setDropdownOpen(false); toast('Coming soon — this feature is being built.', 'info') }}
+                  onClick={() => { setDropdownOpen(false); router.push('/dashboard/settings') }}
                   onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#F0EBE1')}
                   onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#6b6b6b')}
                 >

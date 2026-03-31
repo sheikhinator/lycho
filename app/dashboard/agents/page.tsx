@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { MessageSquare, Settings, RefreshCw, Bot } from 'lucide-react'
+import { MessageSquare, Settings, RefreshCw, Bot, Wand2 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { DeployAgentModal } from '@/components/dashboard/DeployAgentModal'
@@ -234,9 +234,17 @@ export default function AgentsPage() {
                 Deploy and manage your AI workforce
               </p>
             </div>
-            <Button variant="primary" onClick={() => setModalOpen(true)}>
-              Deploy New Agent
-            </Button>
+            <div className="flex gap-2">
+              <Link href="/dashboard/agents/builder">
+                <Button variant="ghost" className="flex items-center gap-2" style={{ color: '#C9A84C', border: '1px solid rgba(201,168,76,0.4)' }}>
+                  <Wand2 size={14} />
+                  Build Custom Agent
+                </Button>
+              </Link>
+              <Button variant="primary" onClick={() => setModalOpen(true)}>
+                Deploy New Agent
+              </Button>
+            </div>
           </div>
 
           {/* Loading */}

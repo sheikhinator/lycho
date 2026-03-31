@@ -62,15 +62,20 @@ Rules:
     systemPrompt: prompt,
     messages: [{ role: 'user', content: 'Generate 5 novel agent specifications now.' }],
     model: MODELS.fast,
-    maxTokens: 2000,
+    maxTokens: 3000,
     useCache: false,
   })
 
   // 5. Parse JSON array — find array even if there's extra text
-  console.log('Raw Claude response:', response)
+  console.log('Claude raw response length:', response.length)
+  console.log('First 500 chars:', response.substring(0, 500))
+  const match = response.match(/\[[\s\S]*\]/)
+  console.log('JSON match found:', !!match)
+  if (match) {
+    console.log('Matched JSON length:', match[0].length)
+  }
   let agents: ForgedAgent[] = []
   try {
-    const match = response.match(/\[[\s\S]*\]/)
     if (!match) throw new Error('No JSON array found in response')
     agents = JSON.parse(match[0])
     if (!Array.isArray(agents)) throw new Error('Parsed value is not an array')
@@ -78,7 +83,19 @@ Rules:
   } catch(e) {
     console.error('JSON parse error:', e)
     console.error('Raw text was:', response)
-    throw new Error(`Forge failed to parse Claude response: ${e}`)
+    // Fallback: try parsing each line individually
+    console.log('Attempting line-by-line fallback parse...')
+    for (const line of response.split('\n')) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const agent = JSON.parse(trimmed)
+          if (agent.agent_type) agents.push(agent)
+        } catch { /* skip invalid lines */ }
+      }
+    }
+    if (agents.length === 0) throw new Error(`Forge failed to parse Claude response: ${e}`)
+    console.log('Fallback parsed', agents.length, 'agents')
   }
 
   // 6. Filter out already-queued types, then insert
