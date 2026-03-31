@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,11 +37,12 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
 
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app').split(',')
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app'
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? appUrl).split(',')
     const requestOrigin  = request.headers.get('origin') ?? ''
     const redirectOrigin = allowedOrigins.some(o => requestOrigin.startsWith(o.trim()))
       ? requestOrigin
-      : (process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app')
+      : appUrl
 
     const { data: authData, error: authError } = await anonClient.auth.signUp({
       email: normalised,
@@ -58,6 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Signup failed — no user returned. User may already exist.' }, { status: 400 })
     }
 
+    // Insert tenant
     const { data: tenant, error: tenantError } = await admin
       .from('tenants')
       .insert({
@@ -89,6 +94,48 @@ export async function POST(request: NextRequest) {
       console.error('[signup] User insert error:', userError)
       await admin.auth.admin.deleteUser(userId)
       return NextResponse.json({ error: `User creation failed: ${userError.message}` }, { status: 400 })
+    }
+
+    // Send verification email via Resend (bypass Supabase email system)
+    try {
+      const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: normalised,
+        options: { redirectTo: `${appUrl}/auth/callback` },
+      })
+
+      console.log('[signup] generateLink result:', JSON.stringify({ action_link: linkData?.properties?.action_link, error: linkError }))
+
+      if (linkError) {
+        console.error('[signup] generateLink error:', linkError)
+      } else {
+        const actionLink = linkData?.properties?.action_link
+        const { error: resendError } = await resend.emails.send({
+          from: 'Lycho Systems <onboarding@resend.dev>',
+          to: normalised,
+          subject: 'Confirm your LYCHO account',
+          html: `
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#070707;color:#fff;padding:40px;border-radius:12px">
+              <h1 style="color:#C9A84C;font-size:28px;margin-bottom:8px">Welcome to LYCHO</h1>
+              <p style="color:#888;margin-bottom:24px">Intelligence. Transmitted.</p>
+              <p style="color:#fff;margin-bottom:24px">Click the button below to confirm your account and get started.</p>
+              <a href="${actionLink}"
+                 style="background:#C9A84C;color:#070707;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">
+                Confirm My Account
+              </a>
+              <p style="color:#444;font-size:12px;margin-top:32px">If you didn't create this account, ignore this email.</p>
+            </div>
+          `,
+        })
+
+        if (resendError) {
+          console.error('[signup] Resend error:', resendError)
+        } else {
+          console.log('[signup] Verification email sent via Resend to:', normalised)
+        }
+      }
+    } catch (emailErr) {
+      console.error('[signup] Email send failed (non-fatal):', emailErr)
     }
 
     return NextResponse.json({ success: true })
