@@ -68,27 +68,8 @@ export async function PUT(
 
   if (queueErr) return err(queueErr.message, 'DB_ERROR', 500)
 
-  // Insert into marketplace_agents so it appears in marketplace
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: marketplaceErr } = await (adminClient as any)
-    .from('marketplace_agents')
-    .upsert({
-      agent_type:           entry.agent_type,
-      display_name:         entry.display_name,
-      description:          entry.description,
-      system_prompt:        entry.system_prompt,
-      recommended_channels: entry.recommended_channels ?? [],
-      model_complexity:     entry.model_complexity ?? 'simple',
-      estimated_value_pkr:  entry.estimated_value_pkr ?? 0,
-      sector_tags:          entry.sector_tags ?? [],
-      use_case_examples:    entry.use_case_examples ?? [],
-      status:               'active',
-    }, { onConflict: 'agent_type' })
-
-  if (marketplaceErr) {
-    console.error('marketplace_agents insert error:', marketplaceErr.message, marketplaceErr)
-    return err(`Approved but marketplace insert failed: ${marketplaceErr.message}`, 'MARKETPLACE_ERROR', 500)
-  }
+  // forge_queue status = 'approved' is the source of truth for marketplace
+  // No separate table needed — marketplace API reads directly from forge_queue
 
   // Send confirmation email to master
   const masterEmail = process.env.MASTER_EMAIL
