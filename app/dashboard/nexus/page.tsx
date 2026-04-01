@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useId } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, Plus, Trash2, ChevronRight, ChevronLeft, X, Play, Pause, FileText, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Zap, Plus, Trash2, ChevronRight, ChevronLeft, X, Play, Pause, FileText, RefreshCw, CheckCircle2, XCircle, Wand2 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { Button } from '@/components/ui/Button'
@@ -956,9 +957,16 @@ export default function NexusPage() {
               <h1 className="font-bebas text-5xl tracking-[0.15em] leading-none" style={{ color: '#C9A84C' }}>THE NEXUS</h1>
               <p className="text-sm font-sans mt-2" style={{ color: '#6b6b6b' }}>Automate everything. Connect anywhere.</p>
             </div>
-            <Button variant="primary" onClick={() => setModalOpen(true)} className="gap-2 shrink-0">
-              <Zap size={15} /> Create Automation
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Link href="/dashboard/nexus/builder">
+                <Button variant="ghost" className="gap-2" style={{ color: '#C9A84C', border: '1px solid rgba(201,168,76,0.4)' }}>
+                  <Wand2 size={14} /> Build with AI
+                </Button>
+              </Link>
+              <Button variant="primary" onClick={() => setModalOpen(true)} className="gap-2">
+                <Zap size={15} /> Create Automation
+              </Button>
+            </div>
           </div>
 
           {/* Stats */}

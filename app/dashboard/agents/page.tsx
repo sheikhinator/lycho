@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { MessageSquare, Settings, RefreshCw, Bot, Wand2, Trash2 } from 'lucide-react'
+import { MessageSquare, Settings, RefreshCw, Bot, Wand2, Trash2, MessagesSquare } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { DeployAgentModal } from '@/components/dashboard/DeployAgentModal'
@@ -165,6 +165,15 @@ function AgentCard({
           <RefreshCw size={13} className={toggling ? 'animate-spin' : ''} />
           {isPaused ? 'Resume' : 'Pause'}
         </Button>
+
+        {agent.status === 'active' && (
+          <Link href={`/dashboard/agents/${agent.id}/chat`} className="w-full">
+            <Button variant="ghost" size="sm" className="w-full justify-start gap-2" style={{ color: '#C9A84C' }}>
+              <MessagesSquare size={13} />
+              Chat with Agent
+            </Button>
+          </Link>
+        )}
 
         <Link href={`/dashboard/conversations?agent=${agent.id}`} className="w-full">
           <Button variant="ghost" size="sm" className="w-full justify-start gap-2">

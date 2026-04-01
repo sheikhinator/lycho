@@ -506,7 +506,7 @@ function WidgetTab({ agent }: { agent: Agent }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'config' | 'versions' | 'widget'
+type Tab = 'overview' | 'config' | 'versions' | 'widget' | 'chat'
 
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -551,6 +551,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     { key: 'config',   label: 'Configuration' },
     { key: 'versions', label: 'Version History' },
     { key: 'widget',   label: 'Widget' },
+    { key: 'chat',     label: '💬 Chat' },
   ]
 
   return (
@@ -623,6 +624,18 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
                 <VersionHistoryTab agentId={agent.id} currentVersion={agent.version} />
               )}
               {activeTab === 'widget' && <WidgetTab agent={agent} />}
+              {activeTab === 'chat' && (
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
+                    Open the full chat experience with {agent.display_name ?? 'this agent'}.
+                  </p>
+                  <a href={`/dashboard/agents/${agent.id}/chat`}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-sans font-medium"
+                    style={{ background: '#C9A84C', color: '#070707' }}>
+                    Open Chat →
+                  </a>
+                </div>
+              )}
             </>
           )}
         </main>
