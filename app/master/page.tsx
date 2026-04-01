@@ -44,30 +44,35 @@ export default function MasterPanel() {
 
   async function runForge() {
     setForgeLoading(true)
-    setForgeResult('')
+    setForgeResult('⏳ Forge is running...')
     try {
       const res = await fetch('/api/forge/autonomous', {
         method: 'POST',
         headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
       })
-      const text = await res.text()
-      if (!text) { setForgeResult('❌ Empty response'); setForgeLoading(false); return }
-      const json = JSON.parse(text)
-      if (res.ok) {
-        setForgeResult('⏳ Forge is running... agents will appear in queue within 30 seconds')
-        setTimeout(() => {
-          loadSection('forge')
-          setForgeResult('✅ Done — check queue below')
-          setForgeLoading(false)
-        }, 35000)
-      } else {
-        setForgeResult(`❌ Error: ${json.error}`)
-        setForgeLoading(false)
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      let chunks = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks += new TextDecoder().decode(value)
       }
-    } catch(e: any) {
-      setForgeResult(`❌ Failed: ${e.message}`)
-      setForgeLoading(false)
+
+      const json = JSON.parse(chunks)
+      if (json.success) {
+        setForgeResult(`✅ ${json.agents_queued} agents queued — refreshing...`)
+        loadSection('forge')
+      } else {
+        setForgeResult(`❌ ${json.error}`)
+      }
+    } catch(e: unknown) {
+      const err = e as { message?: string }
+      setForgeResult(`❌ ${err.message}`)
     }
+    setForgeLoading(false)
   }
 
   useEffect(() => { if (authed) loadSection('dashboard') }, [authed])
