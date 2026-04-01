@@ -143,6 +143,25 @@ function AgentCard({
         </div>
       )}
 
+      {/* Chat CTA — prominent, above action buttons */}
+      {agent.status === 'active' && (
+        <Link href={`/dashboard/agents/${agent.id}/chat`} className="w-full">
+          <button
+            className="w-full py-2.5 rounded-lg text-sm font-sans font-medium flex items-center justify-center gap-2 transition-all"
+            style={{
+              background: 'rgba(201,168,76,0.1)',
+              border: '1px solid rgba(201,168,76,0.35)',
+              color: '#C9A84C',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(201,168,76,0.18)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(201,168,76,0.1)' }}
+          >
+            <MessagesSquare size={14} />
+            Chat with Agent
+          </button>
+        </Link>
+      )}
+
       {/* Actions */}
       <div
         className="flex flex-col gap-2 pt-3"
@@ -165,15 +184,6 @@ function AgentCard({
           <RefreshCw size={13} className={toggling ? 'animate-spin' : ''} />
           {isPaused ? 'Resume' : 'Pause'}
         </Button>
-
-        {agent.status === 'active' && (
-          <Link href={`/dashboard/agents/${agent.id}/chat`} className="w-full">
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2" style={{ color: '#C9A84C' }}>
-              <MessagesSquare size={13} />
-              Chat with Agent
-            </Button>
-          </Link>
-        )}
 
         <Link href={`/dashboard/conversations?agent=${agent.id}`} className="w-full">
           <Button variant="ghost" size="sm" className="w-full justify-start gap-2">

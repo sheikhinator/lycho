@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { use, useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Send, Paperclip, X, Bot, User, ImageIcon, FileText, Loader2 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
@@ -20,7 +20,8 @@ interface AttachedFile {
 const ACCEPTED = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.csv,.json,.md'
 const MAX_FILE_MB = 10
 
-export default function AgentChatPage({ params }: { params: { id: string } }) {
+export default function AgentChatPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: agentId } = use(params)
   const [messages, setMessages]     = useState<Message[]>([])
   const [input, setInput]           = useState('')
   const [files, setFiles]           = useState<AttachedFile[]>([])
@@ -37,11 +38,11 @@ export default function AgentChatPage({ params }: { params: { id: string } }) {
 
   // Fetch agent name
   useEffect(() => {
-    fetch(`/api/agents/${params.id}`)
+    fetch(`/api/agents/${agentId}`)
       .then(r => r.json())
       .then(j => { if (j.data?.display_name) setAgentName(j.data.display_name) })
       .catch(() => {})
-  }, [params.id])
+  }, [agentId])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? [])
@@ -90,7 +91,7 @@ export default function AgentChatPage({ params }: { params: { id: string } }) {
       form.append('history', JSON.stringify(historyForAPI))
       attachedFiles.forEach(af => form.append('file', af.file, af.file.name))
 
-      const res = await fetch(`/api/agents/${params.id}/chat`, { method: 'POST', body: form })
+      const res = await fetch(`/api/agents/${agentId}/chat`, { method: 'POST', body: form })
       const json = await res.json()
 
       if (res.status === 402) { setPlanError(true); setSending(false); return }
@@ -106,7 +107,7 @@ export default function AgentChatPage({ params }: { params: { id: string } }) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Network error — please try again.' }])
     }
     setSending(false)
-  }, [sending, input, files, messages, params.id])
+  }, [sending, input, files, messages, agentId])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
@@ -154,7 +155,7 @@ export default function AgentChatPage({ params }: { params: { id: string } }) {
 
         {/* Chat header */}
         <div className="flex items-center gap-3 px-4 lg:px-6 py-3 shrink-0" style={{ background: '#141414', borderBottom: '1px solid #2a2a2a' }}>
-          <Link href={`/dashboard/agents/${params.id}?tab=overview`} className="flex items-center gap-1.5 text-sm font-sans" style={{ color: '#6b6b6b' }}>
+          <Link href={`/dashboard/agents/${agentId}?tab=overview`} className="flex items-center gap-1.5 text-sm font-sans" style={{ color: '#6b6b6b' }}>
             <ArrowLeft size={14} />
           </Link>
           <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)' }}>

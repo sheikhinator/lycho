@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { use, useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, RotateCcw, Copy, Check, Code2, ExternalLink } from 'lucide-react'
@@ -508,7 +508,8 @@ function WidgetTab({ agent }: { agent: Agent }) {
 
 type Tab = 'overview' | 'config' | 'versions' | 'widget' | 'chat'
 
-export default function AgentDetailPage({ params }: { params: { id: string } }) {
+export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: agentId } = use(params)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -522,7 +523,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     setLoading(true)
     setError(false)
     try {
-      const res = await fetch(`/api/agents/${params.id}`)
+      const res = await fetch(`/api/agents/${agentId}`)
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return }
         if (res.status === 404) { router.push('/dashboard/agents'); return }
@@ -536,7 +537,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setLoading(false)
     }
-  }, [params.id, router])
+  }, [agentId, router])
 
   useEffect(() => { fetchAgent() }, [fetchAgent])
 
@@ -591,7 +592,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
             {TABS.map(t => (
               <button
                 key={t.key}
-                onClick={() => router.push(`/dashboard/agents/${params.id}?tab=${t.key}`)}
+                onClick={() => router.push(`/dashboard/agents/${agentId}?tab=${t.key}`)}
                 className="px-4 py-2 text-sm font-sans transition-colors"
                 style={{
                   background: activeTab === t.key ? 'rgba(201,168,76,0.08)' : '#1c1c1c',
@@ -629,7 +630,7 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
                   <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
                     Open the full chat experience with {agent.display_name ?? 'this agent'}.
                   </p>
-                  <a href={`/dashboard/agents/${agent.id}/chat`}
+                  <a href={`/dashboard/agents/${agentId}/chat`}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-sans font-medium"
                     style={{ background: '#C9A84C', color: '#070707' }}>
                     Open Chat →
