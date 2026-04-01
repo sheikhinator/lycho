@@ -10,7 +10,7 @@ import { createClientSupabase } from '@/lib/supabase'
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const fromSignup = searchParams.get('from') === 'signup'
+  const fromSignup = searchParams.get('from') === 'signup' || searchParams.get('welcome') === 'true'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ email: '', password: '' })
@@ -37,6 +37,18 @@ function LoginForm() {
       setLoading(false)
       return
     }
+
+    // Check onboarding status — new users go to /onboarding first
+    try {
+      const res = await fetch('/api/onboarding')
+      if (res.ok) {
+        const json = await res.json()
+        if (!json.data?.onboarding_completed) {
+          router.push('/onboarding')
+          return
+        }
+      }
+    } catch { /* fallback to dashboard */ }
 
     router.push('/dashboard')
     router.refresh()

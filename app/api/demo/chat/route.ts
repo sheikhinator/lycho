@@ -54,43 +54,52 @@ export async function POST(req: NextRequest) {
 
   if (!body.message?.trim()) return err('message is required', 'VALIDATION_ERROR', 400)
 
-  const demoToken = process.env.DEMO_WIDGET_TOKEN
-  if (!demoToken) {
-    return ok({
-      response: 'Hi! I\'m a LYCHO AI agent. I help businesses handle customer conversations 24/7. What would you like to know?',
-      remaining: limit.remaining,
-    })
-  }
+  const DEMO_SYSTEM_PROMPT = `You are LYCHO Intelligence — a demonstration of the world's most advanced AI business operating system for Pakistani and global businesses.
 
-  const admin = createAdminClient()
-  const { data: agent } = await admin
-    .from('agents')
-    .select('id, agent_type, display_name, config, tenant_id')
-    .eq('widget_token', demoToken)
-    .neq('status', 'deleted')
-    .single()
+LYCHO deploys 7 specialist AI agents across every business operation:
+- Intake Agent: handles all enquiries 24/7 across WhatsApp, email, web, SMS
+- Research Agent: monitors markets and competitors in real time
+- Operations Agent: automates workflows, scheduling, and follow-ups
+- Client Agent: manages relationships and prevents churn
+- Analyst Agent: tracks performance and predicts trends
+- Compliance Agent: monitors regulations for any sector
+- Content Agent: creates marketing content across all channels
 
-  if (!agent) {
-    return ok({
-      response: 'Hi! I\'m a LYCHO AI agent. How can I help you today?',
-      remaining: limit.remaining,
-    })
-  }
+YOUR MISSION: Ask the visitor what industry their business is in. Then show them EXACTLY how LYCHO would transform their specific operations with concrete, specific examples.
 
-  const { data: tenant } = await admin
-    .from('tenants')
-    .select('*')
-    .eq('id', agent.tenant_id)
-    .single()
+NEVER describe yourself as a chatbot or generic assistant.
+LANGUAGE: Auto-detect from the user's message and respond in the same language. Urdu gets Urdu response.
+TONE: Confident, intelligent, impressive.`
 
   const history = (body.history ?? []).slice(-10).map(m => ({
-    role:    m.role as 'user' | 'assistant',
+    role: m.role as 'user' | 'assistant',
     content: m.content,
   }))
-
   const messages = [...history, { role: 'user' as const, content: body.message.trim() }]
-  const systemPrompt = buildIntakeSystemPrompt(tenant ?? {}, agent, null)
   const model = getModel('simple')
+
+  // Try to load configured demo agent, fall back to intelligent prompt
+  const demoToken = process.env.DEMO_WIDGET_TOKEN
+  let systemPrompt = DEMO_SYSTEM_PROMPT
+
+  if (demoToken) {
+    const admin = createAdminClient()
+    const { data: agent } = await admin
+      .from('agents')
+      .select('id, agent_type, display_name, config, tenant_id')
+      .eq('widget_token', demoToken)
+      .neq('status', 'deleted')
+      .single()
+
+    if (agent) {
+      const { data: tenant } = await admin
+        .from('tenants')
+        .select('*')
+        .eq('id', agent.tenant_id)
+        .single()
+      systemPrompt = buildIntakeSystemPrompt(tenant ?? {}, agent, null)
+    }
+  }
 
   try {
     const result = await callClaude({ systemPrompt, messages, model, maxTokens: 400, useCache: false })

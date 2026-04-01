@@ -66,7 +66,7 @@ export default function SignupPage() {
       }
 
       setSuccess(true)
-      setTimeout(() => router.push('/login?from=signup'), 2000)
+      setTimeout(() => router.push('/login?welcome=true'), 2000)
     } catch {
       setError('Network error. Please check your connection.')
     } finally {

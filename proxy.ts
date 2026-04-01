@@ -8,7 +8,7 @@ const PROTECTED = ['/dashboard', '/agents', '/conversations', '/billing', '/sett
 // /master handles its own auth via master_session cookie in app/master/layout.tsx
 const PUBLIC = ['/', '/login', '/signup', '/forgot-password', '/developers', '/onboarding', '/widget', '/components', '/master', '/master-login', '/demo', '/activate', '/auth']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip session check for explicitly public routes
