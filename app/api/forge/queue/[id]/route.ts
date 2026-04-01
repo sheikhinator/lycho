@@ -68,7 +68,7 @@ export async function PUT(
 
   if (queueErr) return err(queueErr.message, 'DB_ERROR', 500)
 
-  // Insert into marketplace_agents so it appears in marketplace and routes conversations
+  // Insert into marketplace_agents so it appears in marketplace
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: marketplaceErr } = await (adminClient as any)
     .from('marketplace_agents')
@@ -82,21 +82,19 @@ export async function PUT(
       estimated_value_pkr:  entry.estimated_value_pkr ?? 0,
       sector_tags:          entry.sector_tags ?? [],
       use_case_examples:    entry.use_case_examples ?? [],
-      source:               'forge',
       status:               'active',
-      created_at:           now,
     }, { onConflict: 'agent_type' })
 
   if (marketplaceErr) {
-    console.error('marketplace_agents insert error:', marketplaceErr)
-    // Don't fail — queue is already marked approved
+    console.error('marketplace_agents insert error:', marketplaceErr.message, marketplaceErr)
+    return err(`Approved but marketplace insert failed: ${marketplaceErr.message}`, 'MARKETPLACE_ERROR', 500)
   }
 
   // Send confirmation email to master
   const masterEmail = process.env.MASTER_EMAIL
   if (masterEmail && process.env.RESEND_API_KEY) {
     await resend.emails.send({
-      from: 'LYCHO Forge <forge@lycho.ai>',
+      from: 'LYCHO Forge <onboarding@resend.dev>',
       to:   masterEmail,
       subject: `[LYCHO Forge] Agent approved & deployed: ${entry.display_name}`,
       html: `<h2>${entry.display_name} is live</h2>

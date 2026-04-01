@@ -214,7 +214,9 @@ export default function MasterPanel() {
                     </div>
                     <div style={{display:'flex',gap:8}}>
                       <button onClick={async()=>{
-                        await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'approve'})})
+                        const res = await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'approve'})})
+                        const json = await res.json()
+                        if (!res.ok) { alert(`Approve failed: ${json.error}`); return }
                         loadSection('forge')
                       }} style={{background:'#064e3b',color:'#34d399',border:'1px solid #065f46',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer',fontWeight:600}}>
                         Approve &amp; Deploy
