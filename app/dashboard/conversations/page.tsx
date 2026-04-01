@@ -299,6 +299,7 @@ export default function ConversationsPage() {
       const res = await fetch(`/api/conversations?${params}`)
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return }
+        if (res.status === 403) { setConversations([]); setTotal(0); return } // no tenant yet
         setError(true)
         return
       }

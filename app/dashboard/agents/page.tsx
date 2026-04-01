@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { MessageSquare, Settings, RefreshCw, Bot, Wand2 } from 'lucide-react'
+import { MessageSquare, Settings, RefreshCw, Bot, Wand2, Trash2 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { DeployAgentModal } from '@/components/dashboard/DeployAgentModal'
@@ -67,16 +67,31 @@ function TypeBadge({ type }: { type: string }) {
 function AgentCard({
   agent,
   onStatusToggle,
+  onDeleted,
 }: {
   agent: Agent
   onStatusToggle: (id: string, current: string) => Promise<void>
+  onDeleted: (id: string) => void
 }) {
+  const { toast } = useToast()
   const [toggling, setToggling] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function handleToggle() {
     setToggling(true)
     await onStatusToggle(agent.id, agent.status)
     setToggling(false)
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Delete "${agent.display_name ?? agent.agent_type}"? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' })
+      if (res.ok) { toast('Agent deleted', 'success'); onDeleted(agent.id) }
+      else { const j = await res.json(); toast(j.error ?? 'Delete failed', 'error') }
+    } catch { toast('Network error', 'error') }
+    finally { setDeleting(false) }
   }
 
   const isPaused = agent.status === 'paused'
@@ -157,6 +172,18 @@ function AgentCard({
             View Conversations
           </Button>
         </Link>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2"
+          disabled={deleting}
+          onClick={handleDelete}
+          style={{ color: '#f87171' }}
+        >
+          <Trash2 size={13} />
+          {deleting ? 'Deleting…' : 'Delete Agent'}
+        </Button>
       </div>
     </div>
   )
@@ -177,6 +204,7 @@ export default function AgentsPage() {
       const res = await fetch('/api/agents')
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return }
+        if (res.status === 403) { setAgents([]); return } // no tenant yet — show empty state
         setError(true)
         return
       }
@@ -296,6 +324,7 @@ export default function AgentsPage() {
                   key={agent.id}
                   agent={agent}
                   onStatusToggle={handleStatusToggle}
+                  onDeleted={(id) => setAgents(prev => prev.filter(a => a.id !== id))}
                 />
               ))}
             </div>

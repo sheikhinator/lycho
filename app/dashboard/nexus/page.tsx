@@ -377,6 +377,18 @@ function CreateAutomationModal({
   const [description, setDescription]  = useState('')
   const [saving, setSaving]             = useState(false)
   const [templateCat, setTemplateCat]   = useState<string>('all')
+  const [dynamicTemplates, setDynamicTemplates] = useState<typeof AUTOMATION_TEMPLATES>([])
+
+  useEffect(() => {
+    fetch('/api/nexus/templates')
+      .then(r => r.json())
+      .then(j => {
+        if (j.templates?.length) setDynamicTemplates(j.templates)
+      })
+      .catch(() => {})
+  }, [])
+
+  const allTemplates = [...AUTOMATION_TEMPLATES, ...dynamicTemplates]
 
   const inputCls = 'w-full px-3 py-2.5 rounded text-sm font-sans outline-none'
   const inputStyle = { background: '#1c1c1c', border: '1px solid #2a2a2a', color: '#F0EBE1' }
@@ -420,8 +432,8 @@ function CreateAutomationModal({
 
   const cats = ['all', 'leads', 'conversations', 'sentiment', 'agents', 'schedule']
   const filteredTemplates = templateCat === 'all'
-    ? AUTOMATION_TEMPLATES
-    : AUTOMATION_TEMPLATES.filter(t => t.category === templateCat)
+    ? allTemplates
+    : allTemplates.filter(t => t.category === templateCat)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>

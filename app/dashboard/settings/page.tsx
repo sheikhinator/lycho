@@ -904,6 +904,72 @@ function NotificationsTab() {
   )
 }
 
+// ─── Danger Zone ─────────────────────────────────────────────────────────────
+
+function DangerZone() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+
+  async function handleDelete() {
+    if (confirmText !== 'DELETE') return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/account/delete', { method: 'DELETE' })
+      if (!res.ok) { const j = await res.json(); toast(j.error ?? 'Delete failed', 'error'); return }
+      toast('Account deleted. Goodbye.', 'success')
+      setTimeout(() => router.push('/'), 1500)
+    } catch {
+      toast('Network error', 'error')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="mt-16 pt-8" style={{ borderTop: '1px solid rgba(248,113,113,0.15)' }}>
+      <p className="text-xs font-sans uppercase tracking-widest mb-4" style={{ color: '#7f1d1d' }}>Danger Zone</p>
+      <div className="rounded-lg p-5 max-w-lg" style={{ background: 'rgba(248,113,113,0.04)', border: '1px solid rgba(248,113,113,0.15)' }}>
+        <h3 className="text-sm font-sans font-semibold mb-1" style={{ color: '#f87171' }}>Delete Account</h3>
+        <p className="text-xs font-sans mb-4" style={{ color: '#6b6b6b' }}>
+          Permanently delete your account, all agents, and all data. This cannot be undone.
+        </p>
+        {!confirming ? (
+          <Button variant="ghost" size="sm" onClick={() => setConfirming(true)} style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.3)' }}>
+            <Trash2 size={13} className="mr-1.5" /> Delete Account
+          </Button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs font-sans" style={{ color: '#f87171' }}>Type <strong>DELETE</strong> to confirm:</p>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full px-3 py-2 rounded text-sm font-sans outline-none"
+              style={{ background: '#1c1c1c', border: '1px solid rgba(248,113,113,0.3)', color: '#F0EBE1' }}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={confirmText !== 'DELETE' || deleting}
+                onClick={handleDelete}
+                style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', opacity: confirmText !== 'DELETE' ? 0.4 : 1 }}
+              >
+                {deleting ? 'Deleting…' : 'Confirm Delete'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setConfirming(false); setConfirmText('') }}>Cancel</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -970,6 +1036,9 @@ export default function SettingsPage() {
           {activeTab === 'team'          && <TeamTab />}
           {activeTab === 'integrations'  && <IntegrationsTab tenantId={tenantId} />}
           {activeTab === 'notifications' && <NotificationsTab />}
+
+          {/* Danger Zone — always visible */}
+          <DangerZone />
         </main>
       </div>
     </div>

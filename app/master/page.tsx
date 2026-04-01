@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-const SECTIONS = ['dashboard', 'tenants', 'forge', 'payments', 'waitlist'] as const
+const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'payments', 'waitlist'] as const
 type Section = typeof SECTIONS[number]
 
 export default function MasterPanel() {
@@ -13,6 +13,8 @@ export default function MasterPanel() {
   const [loading, setLoading] = useState(false)
   const [forgeLoading, setForgeLoading] = useState(false)
   const [forgeResult, setForgeResult] = useState('')
+  const [nexusLoading, setNexusLoading] = useState(false)
+  const [nexusResult, setNexusResult] = useState('')
 
   useEffect(() => {
     const saved = sessionStorage.getItem('lycho_master')
@@ -40,6 +42,28 @@ export default function MasterPanel() {
       setData(json)
     } catch { setData(null) }
     setLoading(false)
+  }
+
+  async function runNexus() {
+    setNexusLoading(true)
+    setNexusResult('⏳ Nexus is running...')
+    try {
+      const res = await fetch('/api/nexus/generate', {
+        method: 'POST',
+        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+      })
+      const json = await res.json()
+      if (json.success) {
+        setNexusResult(`✅ ${json.templates_queued} templates queued — refreshing...`)
+        loadSection('nexus')
+      } else {
+        setNexusResult(`❌ ${json.error}`)
+      }
+    } catch(e: unknown) {
+      const err = e as { message?: string }
+      setNexusResult(`❌ ${err.message}`)
+    }
+    setNexusLoading(false)
   }
 
   async function runForge() {
@@ -112,7 +136,7 @@ export default function MasterPanel() {
             style={{padding:'10px 20px',cursor:'pointer',background:section===s?'rgba(201,168,76,0.08)':'transparent',
               borderLeft:section===s?'2px solid #C9A84C':'2px solid transparent',
               color:section===s?'#C9A84C':'#666',fontSize:13,textTransform:'capitalize',transition:'all 0.2s'}}>
-            {s === 'forge' ? 'Forge Queue' : s === 'payments' ? 'Payments' : s.charAt(0).toUpperCase()+s.slice(1)}
+            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s.charAt(0).toUpperCase()+s.slice(1)}
           </div>
         ))}
         <div style={{padding:'10px 20px',marginTop:16,borderTop:'1px solid #1a1a1a'}}>
@@ -165,7 +189,7 @@ export default function MasterPanel() {
               <div>
                 <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,marginBottom:24,letterSpacing:1}}>ALL TENANTS</h2>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr>{['Business','Email','Plan','Status','Agents','Trial Ends','Joined'].map(h=>(
+                  <thead><tr>{['Business','Email','Plan','Status','Agents','Trial Ends','Joined','Action'].map(h=>(
                     <th key={h} style={{textAlign:'left',padding:'8px 12px',color:'#444',fontSize:11,borderBottom:'1px solid #1a1a1a'}}>{h}</th>
                   ))}</tr></thead>
                   <tbody>{(data.tenants||[]).map((t:any)=>(
@@ -177,6 +201,17 @@ export default function MasterPanel() {
                       <td style={{padding:'10px 12px',fontSize:13}}>{t.agent_count||0}</td>
                       <td style={{padding:'10px 12px',fontSize:13,color:'#444'}}>{t.trial_ends_at?new Date(t.trial_ends_at).toLocaleDateString():'-'}</td>
                       <td style={{padding:'10px 12px',fontSize:13,color:'#444'}}>{new Date(t.created_at).toLocaleDateString()}</td>
+                      <td style={{padding:'10px 12px'}}>
+                        <button onClick={async()=>{
+                          if(!confirm(`Permanently delete "${t.business_name}" (${t.business_email}) and all auth users? This cannot be undone.`)) return
+                          const res = await fetch(`/api/master/tenants/${t.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'purge'})})
+                          const json = await res.json()
+                          if (!res.ok) { alert(`Delete failed: ${json.error}`); return }
+                          loadSection('tenants')
+                        }} style={{background:'transparent',color:'#ef4444',border:'1px solid #7f1d1d',borderRadius:6,padding:'4px 10px',fontSize:11,cursor:'pointer'}}>
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -225,6 +260,59 @@ export default function MasterPanel() {
                         const notes = prompt('Rejection reason (optional):')
                         await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'reject',notes})})
                         loadSection('forge')
+                      }} style={{background:'transparent',color:'#ef4444',border:'1px solid #7f1d1d',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer'}}>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {section === 'nexus' && (
+              <div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:nexusResult?12:24}}>
+                  <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,letterSpacing:1}}>NEXUS QUEUE</h2>
+                  <button onClick={runNexus} disabled={nexusLoading}
+                    style={{background:nexusLoading?'#7a6130':'#C9A84C',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:nexusLoading?'not-allowed':'pointer'}}>
+                    {nexusLoading ? 'Running…' : 'Run Nexus Now'}
+                  </button>
+                </div>
+                {nexusResult && <p style={{color:nexusResult.startsWith('✅')?'#34d399':'#ef4444',fontSize:13,marginBottom:16}}>{nexusResult}</p>}
+                {(data.queue||[]).length===0 && <p style={{color:'#444'}}>No templates in queue. Run Nexus to generate automation templates.</p>}
+                {(data.queue||[]).map((tmpl:any)=>(
+                  <div key={tmpl.id} style={{background:'#111',border:'1px solid #1a1a1a',borderRadius:8,padding:20,marginBottom:16}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+                      <div>
+                        <div style={{color:'#fff',fontSize:16,fontWeight:600}}>{tmpl.name}</div>
+                        <div style={{color:'#666',fontSize:13,marginTop:4}}>{tmpl.description}</div>
+                        <div style={{color:'#444',fontSize:12,marginTop:4}}>Category: {tmpl.category} · Trigger: {tmpl.trigger?.type}</div>
+                      </div>
+                      <span style={{background:'rgba(201,168,76,0.1)',color:'#C9A84C',padding:'2px 8px',borderRadius:4,fontSize:11,whiteSpace:'nowrap'}}>{tmpl.category}</span>
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+                      {(tmpl.sector_tags||[]).map((t:string)=>(
+                        <span key={t} style={{background:'#1a1a1a',color:'#888',padding:'2px 8px',borderRadius:4,fontSize:11}}>{t}</span>
+                      ))}
+                    </div>
+                    <div style={{marginBottom:12}}>
+                      {(tmpl.use_case_examples||[]).map((ex:string,i:number)=>(
+                        <div key={i} style={{color:'#666',fontSize:13,marginBottom:4}}>· {ex}</div>
+                      ))}
+                    </div>
+                    {tmpl.why_useful && <div style={{color:'#888',fontSize:12,marginBottom:12,fontStyle:'italic'}}>{tmpl.why_useful}</div>}
+                    <div style={{display:'flex',gap:8}}>
+                      <button onClick={async()=>{
+                        const res = await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'approve'})})
+                        const json = await res.json()
+                        if (!res.ok) { alert(`Approve failed: ${json.error}`); return }
+                        loadSection('nexus')
+                      }} style={{background:'#064e3b',color:'#34d399',border:'1px solid #065f46',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer',fontWeight:600}}>
+                        Approve &amp; Publish
+                      </button>
+                      <button onClick={async()=>{
+                        const notes = prompt('Rejection reason (optional):')
+                        await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'reject',notes})})
+                        loadSection('nexus')
                       }} style={{background:'transparent',color:'#ef4444',border:'1px solid #7f1d1d',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer'}}>
                         Reject
                       </button>

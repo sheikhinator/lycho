@@ -77,9 +77,35 @@ export function DashboardTopBar({ businessName: bProp, initials: iProp, planStat
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center px-4 lg:px-6 gap-4 shrink-0"
+      className="sticky top-0 z-30 flex items-center px-4 lg:px-6 gap-4 shrink-0 overflow-hidden"
       style={{ height: '60px', background: '#141414', borderBottom: '1px solid #2a2a2a' }}
     >
+      {/* Futuristic background decoration */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        {/* Scan line */}
+        <div
+          className="absolute top-0 left-0 right-0 h-px opacity-20"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, #C9A84C 50%, transparent 100%)', animation: 'scanline 4s ease-in-out infinite' }}
+        />
+        {/* Grid dots — right side */}
+        <svg className="absolute right-0 top-0 h-full w-72 opacity-[0.03]" viewBox="0 0 288 60" preserveAspectRatio="xMaxYMid slice">
+          {Array.from({ length: 10 }, (_, row) =>
+            Array.from({ length: 20 }, (_, col) => (
+              <circle key={`${row}-${col}`} cx={col * 16 + 8} cy={row * 8 + 4} r="0.8" fill="#C9A84C" />
+            ))
+          )}
+        </svg>
+        {/* Diagonal accent line */}
+        <svg className="absolute right-64 top-0 h-full w-24 opacity-10" viewBox="0 0 96 60" preserveAspectRatio="none">
+          <line x1="96" y1="0" x2="0" y2="60" stroke="#C9A84C" strokeWidth="0.5"/>
+          <line x1="80" y1="0" x2="0" y2="48" stroke="#C9A84C" strokeWidth="0.3"/>
+        </svg>
+        {/* Pulse dot — top right corner */}
+        <div className="absolute right-3 top-2 flex items-center gap-1">
+          <div className="w-1 h-1 rounded-full animate-pulse" style={{ background: '#4ade80', opacity: 0.6 }} />
+        </div>
+      </div>
+
       {/* Hamburger — mobile only */}
       <button
         className="lg:hidden flex items-center justify-center transition-colors"

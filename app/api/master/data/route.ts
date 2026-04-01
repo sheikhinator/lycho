@@ -53,5 +53,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ payments: data || [] })
   }
 
+  if (section === 'nexus') {
+    const { data } = await supabase
+      .from('nexus_queue')
+      .select('*')
+      .eq('status', 'pending_review')
+      .order('created_at', { ascending: false })
+    return NextResponse.json({ queue: data || [] })
+  }
+
   return NextResponse.json({})
 }

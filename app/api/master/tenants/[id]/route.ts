@@ -77,6 +77,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       update = { deleted_at: new Date().toISOString() } as any
       break
     }
+    case 'purge': {
+      // Hard delete: soft-delete tenant + agents + delete auth users
+      const { data: users } = await admin.from('users').select('id').eq('tenant_id', id)
+      if (users?.length) {
+        for (const u of users) {
+          await admin.auth.admin.deleteUser(u.id)
+        }
+      }
+      await admin.from('agents').update({ status: 'deleted' } as any).eq('tenant_id', id)
+      const { error: purgeErr } = await admin.from('tenants').update({ deleted_at: new Date().toISOString() } as any).eq('id', id)
+      if (purgeErr) return err('Database error', 'DB_ERROR', 500)
+      await admin.from('audit_log').insert({
+        tenant_id: id, actor_type: 'system', actor_id: 'master_override',
+        action: 'master.tenant.purge', resource_type: 'tenants', resource_id: id, metadata: {},
+      })
+      return ok({ success: true, action: 'purge', tenant_id: id })
+    }
     default:
       return err(`Unknown action: ${action}`, 'BAD_REQUEST', 400)
   }

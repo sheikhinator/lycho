@@ -24,6 +24,13 @@ body {
   }
 }
 
+@keyframes scanline {
+  0%   { opacity: 0; transform: translateX(-100%); }
+  20%  { opacity: 0.25; }
+  80%  { opacity: 0.25; }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
