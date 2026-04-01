@@ -75,11 +75,7 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
       estimated_value_pkr:  Number(agent.estimated_value_pkr) || 0,
       sector_tags:          agent.sector_tags || [],
       use_case_examples:    agent.use_case_examples || [],
-      research_sources:     [],
-      why_novel:            agent.why_novel || '',
       status:               'pending_review',
-      source:               'autonomous',
-      created_at:           new Date().toISOString(),
     })
     if (!error) {
       inserted++
