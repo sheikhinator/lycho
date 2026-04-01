@@ -16,6 +16,7 @@ import { analyseEmotion }               from '@/lib/agents/emotional-intelligenc
 import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
 import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
+import { createNotification } from '@/lib/notifications/notification-service'
 
 // ─── Agent routing helpers ────────────────────────────────────────────────────
 
@@ -358,6 +359,28 @@ export async function POST(req: NextRequest) {
   }
 
   const ownerEmail = tenant.business_email as string | undefined
+
+  if (isNewHotLead) {
+    void createNotification(
+      tenantId,
+      'hot_lead',
+      '🔥 Hot Lead',
+      `Contact scored ${leadScore}/100`,
+      '/dashboard/conversations',
+      supabase,
+    )
+  }
+
+  if (escalated && conversation!.status !== 'escalated') {
+    void createNotification(
+      tenantId,
+      'escalation',
+      '⚡ Escalation',
+      `${body.contact_identifier} needs attention`,
+      '/dashboard/conversations',
+      supabase,
+    )
+  }
 
   if (isNewHotLead && ownerEmail) {
     // Fire-and-forget hot lead alert

@@ -38,12 +38,12 @@ function LoginForm() {
       return
     }
 
-    // Check onboarding status — new users go to /onboarding first
+    // Check has_completed_onboarding — new users go to /onboarding first
     try {
-      const res = await fetch('/api/onboarding')
+      const res = await fetch('/api/users/me')
       if (res.ok) {
         const json = await res.json()
-        if (!json.data?.onboarding_completed) {
+        if (json.data?.user && !json.data.user.has_completed_onboarding) {
           router.push('/onboarding')
           return
         }
@@ -70,7 +70,7 @@ function LoginForm() {
         <div className="bg-deep border border-border rounded-xl p-8">
           {fromSignup && (
             <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded px-3 py-2 mb-4 text-center">
-              Account created successfully. Please sign in.
+              Account created! Sign in to get started.
             </div>
           )}
           <h2 className="font-cormorant text-2xl text-ivory font-medium mb-6">

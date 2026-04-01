@@ -802,11 +802,18 @@ export default function OnboardingPage() {
 
   async function finish() {
     try {
-      await fetch('/api/onboarding', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ onboarding_completed: true }),
-      })
+      await Promise.all([
+        fetch('/api/onboarding', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onboarding_completed: true }),
+        }),
+        fetch('/api/users/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ has_completed_onboarding: true }),
+        }),
+      ])
     } catch {}
     router.push('/dashboard')
   }

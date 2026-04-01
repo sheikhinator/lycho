@@ -96,15 +96,29 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: 'LYCHO <waitlist@lychosystems.com>',
         to: body.email,
-        subject: `You're on the LYCHO waitlist — position #${position}`,
+        subject: `You're #${position} on the LYCHO waitlist`,
         html: `
-          <div style="font-family: sans-serif; color: #F0EBE1; background: #070707; padding: 40px; max-width: 560px;">
-            <h1 style="color: #C9A84C; font-size: 28px; margin-bottom: 8px;">Welcome to LYCHO</h1>
-            <p style="color: #6b6b6b; margin-bottom: 24px;">The universal AI agent platform for Pakistani and global businesses.</p>
-            <p>You're <strong style="color: #C9A84C;">#${position}</strong> on the waitlist.</p>
-            <p style="margin-top: 16px;">Your referral link:</p>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/?ref=${referralCode}" style="color: #C9A84C; word-break: break-all;">${process.env.NEXT_PUBLIC_APP_URL}/?ref=${referralCode}</a>
-            <p style="color: #6b6b6b; font-size: 13px; margin-top: 32px;">Share your link to move up the list.</p>
+          <div style="font-family: sans-serif; background: #070707; padding: 48px 40px; max-width: 560px; margin: 0 auto; border-radius: 16px;">
+            <h1 style="color: #C9A84C; font-size: 32px; margin-bottom: 4px; letter-spacing: 4px;">LYCHO</h1>
+            <p style="color: #6b6b6b; font-size: 12px; letter-spacing: 3px; margin-bottom: 32px;">INTELLIGENCE. TRANSMITTED.</p>
+
+            <div style="background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center;">
+              <p style="color: #6b6b6b; font-size: 13px; margin-bottom: 8px;">You're</p>
+              <p style="color: #F0EBE1; font-size: 48px; font-weight: 700; margin: 0 0 4px;">#${position}</p>
+              <p style="color: #6b6b6b; font-size: 13px;">on the LYCHO waitlist</p>
+            </div>
+
+            <p style="color: #F0EBE1; font-size: 14px; margin-bottom: 8px;">Move up by referring friends:</p>
+            <div style="background: #141414; border: 1px solid rgba(201,168,76,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL}/?ref=${referralCode}" style="color: #C9A84C; font-size: 13px; word-break: break-all; text-decoration: none;">${process.env.NEXT_PUBLIC_APP_URL}/?ref=${referralCode}</a>
+            </div>
+
+            <a href="https://wa.me/?text=${encodeURIComponent(`I just joined the LYCHO waitlist — the AI platform that runs your business 24/7. Join here: ${process.env.NEXT_PUBLIC_APP_URL}/?ref=${referralCode}`)}"
+               style="display: inline-block; background: #25D366; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; text-decoration: none; margin-bottom: 24px;">
+              Share on WhatsApp
+            </a>
+
+            <p style="color: #6b6b6b; font-size: 12px; margin-top: 16px;">Each referral moves you up the list. Top 10 referrers get early access.</p>
           </div>
         `,
       })

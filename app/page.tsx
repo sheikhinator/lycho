@@ -146,6 +146,7 @@ function WaitlistSection() {
   const [error, setError]     = useState<string | null>(null)
   const [success, setSuccess] = useState<{ position: number; referral_code: string } | null>(null)
   const [copied, setCopied]   = useState(false)
+  const [leaderboard, setLeaderboard] = useState<{ position: number; referral_count: number }[]>([])
 
   function getShareUrl(code: string) { return `${APP_URL}/?ref=${code}` }
 
@@ -165,6 +166,10 @@ function WaitlistSection() {
       if (res.status === 200) { setError('This email is already on the waitlist.'); return }
       localStorage.removeItem('lycho_ref_code')
       setSuccess({ position: json.data.position, referral_code: json.data.referral_code })
+      // Load leaderboard
+      fetch('/api/waitlist/leaderboard').then(r => r.json()).then(j => {
+        if (j.data) setLeaderboard(j.data)
+      }).catch(() => {})
     } catch { setError('Network error. Please try again.') }
     finally { setLoading(false) }
   }
@@ -198,7 +203,8 @@ function WaitlistSection() {
               <Check size={22} style={{ color: '#C9A84C' }} />
             </div>
             <p className="font-bebas text-3xl mb-1" style={{ color: '#F0EBE1', letterSpacing: '0.05em' }}>You&apos;re #{success.position}</p>
-            <p className="text-sm font-sans mb-6" style={{ color: '#6b6b6b' }}>on the LYCHO waitlist.</p>
+            <p className="text-sm font-sans mb-2" style={{ color: '#6b6b6b' }}>on the LYCHO waitlist.</p>
+            <p className="text-xs font-sans mb-6" style={{ color: '#C9A84C' }}>Refer friends to move up the list ↓</p>
             <div className="rounded-xl p-4 mb-4 text-left" style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
               <p className="text-xs font-sans mb-3" style={{ color: '#6b6b6b' }}>Share your link to move up the list:</p>
               <div className="flex items-center gap-2 rounded-lg px-3 py-2 mb-3" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a' }}>
@@ -213,6 +219,19 @@ function WaitlistSection() {
                 </button>
               </div>
             </div>
+
+            {/* Leaderboard */}
+            {leaderboard.length > 0 && (
+              <div className="rounded-xl p-4 text-left mt-4" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+                <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#6b6b6b' }}>Top Referrers</p>
+                {leaderboard.map((row, i) => (
+                  <div key={i} className="flex items-center justify-between py-2" style={{ borderBottom: i < leaderboard.length - 1 ? '1px solid #1c1c1c' : 'none' }}>
+                    <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>#{i + 1} · Referrer</span>
+                    <span className="text-xs font-sans font-semibold" style={{ color: '#C9A84C' }}>{row.referral_count} referrals</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-2xl p-8" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>

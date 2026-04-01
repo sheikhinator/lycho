@@ -30,7 +30,21 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: 'LYCHO — Intelligence. Transmitted.',
-  description: 'Universal AI agent platform for Pakistani and global businesses.',
+  description: 'Deploy a complete AI workforce across your entire business. 7 specialist agents running research, operations, compliance, client management, analytics, and content — on 47 surfaces simultaneously.',
+  keywords: 'AI agents, business automation, Pakistan AI, GCC AI, WhatsApp AI, business intelligence',
+  openGraph: {
+    title: 'LYCHO — Intelligence. Transmitted.',
+    description: 'Your business. Running 24/7. In every language.',
+    url: 'https://lycho.vercel.app',
+    siteName: 'LYCHO',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LYCHO — Intelligence. Transmitted.',
+    description: 'Deploy a complete AI workforce across your entire business.',
+  },
+  robots: { index: true, follow: true },
   icons: {
     icon: '/lycho-logo.svg',
     shortcut: '/lycho-logo.svg',

@@ -1,65 +1,97 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, MessageCircle, Smartphone, Settings, CheckCircle } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, Send } from 'lucide-react'
 
 const STEPS = [
   {
-    icon: Smartphone,
-    title: 'Download WhatsApp Business',
-    description: 'Download the WhatsApp Business app on your phone.',
+    n: '01',
+    title: 'Create a Meta Business Account',
+    description: 'Go to Meta Business Suite and create or log in to your business account. This is required to access the WhatsApp Business API.',
     actions: [
-      { label: 'App Store (iOS)', href: 'https://apps.apple.com/app/whatsapp-business/id1386412985' },
-      { label: 'Play Store (Android)', href: 'https://play.google.com/store/apps/details?id=com.whatsapp.w4b' },
+      { label: 'Open Meta Business Suite', href: 'https://business.facebook.com' },
     ],
   },
   {
-    icon: CheckCircle,
-    title: 'Register Your Business Number',
-    description: 'Open WhatsApp Business and register with your business phone number. Use a number dedicated to your business — not your personal WhatsApp number.',
+    n: '02',
+    title: 'Add a WhatsApp Business Number',
+    description: 'In your Meta Business Manager, add a dedicated phone number for WhatsApp. This should be a number not already registered with personal WhatsApp.',
     actions: [],
   },
   {
-    icon: Settings,
-    title: 'Configure Your Business Profile',
-    description: 'Go to Settings → Business Profile. Fill in your business name, category, description, address, email, and website. This information appears to customers.',
+    n: '03',
+    title: 'Apply for WhatsApp Cloud API Access',
+    description: 'Create a Meta Developer app with Business type, then add the WhatsApp product. Complete your business verification to get API access.',
+    actions: [
+      { label: 'Meta Developer Portal', href: 'https://developers.facebook.com/apps/' },
+    ],
+  },
+  {
+    n: '04',
+    title: 'Enter Your Credentials in LYCHO',
+    description: 'After approval, copy your Access Token, Phone Number ID, and Business Account ID from the Meta Developer Portal and enter them below.',
     actions: [],
+    isForm: true,
   },
   {
-    icon: MessageCircle,
-    title: 'Connect to LYCHO',
-    description: 'Go to your LYCHO dashboard → Settings → Integrations → WhatsApp. Enter your business number and follow the verification steps. LYCHO will send a verification code to confirm the connection.',
+    n: '05',
+    title: 'Test Your Connection',
+    description: 'Send a test message to verify your WhatsApp integration is working correctly.',
     actions: [],
-  },
-]
-
-const FAQ = [
-  {
-    q: 'Will my personal WhatsApp be affected?',
-    a: 'No. WhatsApp Business is a separate app from regular WhatsApp. You can run both on the same device with different numbers, or use WhatsApp Business only.',
-  },
-  {
-    q: 'Can I use my existing WhatsApp number?',
-    a: 'Yes, but the number will be converted to a WhatsApp Business account. All existing chats are preserved. However, you cannot use the same number on both regular WhatsApp and WhatsApp Business simultaneously.',
-  },
-  {
-    q: 'How long does verification take?',
-    a: 'Phone number verification via SMS or call takes under 2 minutes. LYCHO integration verification typically completes within a few seconds.',
-  },
-  {
-    q: 'Is there a cost for WhatsApp Business?',
-    a: 'The WhatsApp Business app is free. Business Messaging API (for high-volume automated messaging) has per-message charges — but your LYCHO plan covers this.',
-  },
-  {
-    q: 'What happens if a customer messages outside business hours?',
-    a: 'LYCHO agents respond 24/7 regardless of business hours. You can configure away messages and handoff rules in your agent settings.',
+    isTest: true,
   },
 ]
 
 export default function WhatsAppSetupPage() {
+  const [form, setForm] = useState({ access_token: '', phone_number_id: '', business_account_id: '' })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [testPhone, setTestPhone] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null)
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.access_token || !form.phone_number_id || !form.business_account_id) return
+    setSaving(true)
+    try {
+      await fetch('/api/channel-connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'whatsapp', credentials: form }),
+      })
+      setSaved(true)
+    } catch {}
+    setSaving(false)
+  }
+
+  async function handleTest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!testPhone) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/webhooks/whatsapp/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: testPhone }),
+      })
+      setTestResult(res.ok ? 'success' : 'error')
+    } catch {
+      setTestResult('error')
+    }
+    setTesting(false)
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: '#1c1c1c', border: '1px solid #2a2a2a', color: '#F0EBE1',
+    borderRadius: 8, padding: '10px 14px', width: '100%', fontSize: 14,
+    fontFamily: 'inherit', outline: 'none',
+  }
+
   return (
     <div className="p-6 lg:p-10 max-w-3xl mx-auto">
-      {/* Back */}
       <Link
         href="/dashboard/settings"
         className="inline-flex items-center gap-2 text-sm font-sans mb-8"
@@ -69,109 +101,141 @@ export default function WhatsAppSetupPage() {
         Back to Settings
       </Link>
 
-      {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(37,211,102,0.1)' }}
-          >
-            <MessageCircle size={20} style={{ color: '#25D366' }} />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(37,211,102,0.1)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
           </div>
-          <h1
-            className="font-bebas tracking-wider"
-            style={{ fontSize: 'clamp(1.6rem, 3.5vw, 2.4rem)', color: '#F0EBE1', letterSpacing: '0.05em' }}
-          >
-            WhatsApp Business Setup
+          <h1 className="font-bebas tracking-wider" style={{ fontSize: 'clamp(1.6rem,3.5vw,2.4rem)', color: '#F0EBE1', letterSpacing: '0.05em' }}>
+            WhatsApp Cloud API Setup
           </h1>
         </div>
         <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
-          Connect your WhatsApp Business account to LYCHO so your AI agents can handle customer conversations on WhatsApp.
+          Connect WhatsApp Business API via Meta Developer Portal to enable automated messaging for your AI agents.
         </p>
       </div>
 
       {/* Steps */}
-      <div className="mb-12">
-        <h2 className="text-xs font-sans font-medium uppercase tracking-widest mb-6" style={{ color: '#C9A84C', letterSpacing: '0.12em' }}>
-          Setup Steps
-        </h2>
-        <div className="flex flex-col gap-6">
-          {STEPS.map((step, i) => {
-            const Icon = step.icon
-            return (
-              <div
-                key={i}
-                className="flex gap-4 p-5 rounded-xl"
-                style={{ background: '#141414', border: '1px solid #2a2a2a' }}
-              >
-                <div className="flex flex-col items-center gap-2 shrink-0">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-sans shrink-0"
-                    style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C' }}
-                  >
-                    {i + 1}
+      <div className="flex flex-col gap-6">
+        {STEPS.map((step, i) => (
+          <div key={i} className="rounded-xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+            {/* Step header */}
+            <div className="flex items-start gap-4 p-5">
+              <span className="font-bebas text-2xl shrink-0 mt-0.5" style={{ color: '#C9A84C', letterSpacing: '0.05em', lineHeight: 1 }}>
+                {step.n}
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-sans font-semibold mb-1" style={{ color: '#F0EBE1' }}>{step.title}</p>
+                <p className="text-sm font-sans leading-relaxed" style={{ color: '#6b6b6b' }}>{step.description}</p>
+                {step.actions.length > 0 && (
+                  <div className="flex gap-3 mt-3 flex-wrap">
+                    {step.actions.map(a => (
+                      <a
+                        key={a.label}
+                        href={a.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg"
+                        style={{ background: 'rgba(37,211,102,0.08)', color: '#25D366', border: '1px solid rgba(37,211,102,0.2)', textDecoration: 'none' }}
+                      >
+                        {a.label}
+                        <ExternalLink size={10} />
+                      </a>
+                    ))}
                   </div>
-                  {i < STEPS.length - 1 && (
-                    <div className="w-px flex-1" style={{ background: '#2a2a2a', minHeight: '20px' }} />
-                  )}
-                </div>
-                <div className="flex-1 pt-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon size={15} style={{ color: '#6b6b6b' }} />
-                    <p className="text-sm font-sans font-semibold" style={{ color: '#F0EBE1' }}>{step.title}</p>
-                  </div>
-                  <p className="text-sm font-sans leading-relaxed mb-3" style={{ color: '#6b6b6b' }}>
-                    {step.description}
-                  </p>
-                  {step.actions.length > 0 && (
-                    <div className="flex gap-3 flex-wrap">
-                      {step.actions.map(action => (
-                        <a
-                          key={action.label}
-                          href={action.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-sans px-3 py-1.5 rounded-lg"
-                          style={{ background: 'rgba(37,211,102,0.08)', color: '#25D366', border: '1px solid rgba(37,211,102,0.2)', textDecoration: 'none' }}
-                        >
-                          {action.label}
-                        </a>
-                      ))}
+                )}
+              </div>
+            </div>
+
+            {/* Step 04 — credentials form */}
+            {step.isForm && (
+              <div className="px-5 pb-5" style={{ borderTop: '1px solid #2a2a2a', paddingTop: 16 }}>
+                <form onSubmit={handleSave} className="space-y-3">
+                  {[
+                    { label: 'Access Token', key: 'access_token', placeholder: 'EAAxxxxxxxxxxxxxxx...' },
+                    { label: 'Phone Number ID', key: 'phone_number_id', placeholder: '1234567890123' },
+                    { label: 'Business Account ID', key: 'business_account_id', placeholder: '9876543210987' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label className="block text-xs font-sans uppercase tracking-widest mb-1.5" style={{ color: '#6b6b6b' }}>{f.label}</label>
+                      <input
+                        type={f.key === 'access_token' ? 'password' : 'text'}
+                        style={inputStyle}
+                        placeholder={f.placeholder}
+                        value={form[f.key as keyof typeof form]}
+                        onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        onFocus={e => (e.currentTarget.style.borderColor = '#C9A84C')}
+                        onBlur={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
+                      />
+                    </div>
+                  ))}
+
+                  {saved && (
+                    <div className="flex items-center gap-2 text-xs font-sans" style={{ color: '#4ade80' }}>
+                      <CheckCircle size={13} />
+                      Credentials saved successfully
                     </div>
                   )}
-                </div>
+
+                  <button
+                    type="submit"
+                    disabled={saving || !form.access_token || !form.phone_number_id || !form.business_account_id}
+                    className="px-5 py-2.5 rounded-lg text-sm font-sans font-semibold transition-all"
+                    style={{
+                      background: saving || !form.access_token ? '#2a2a2a' : '#C9A84C',
+                      color: saving || !form.access_token ? '#6b6b6b' : '#070707',
+                      cursor: saving || !form.access_token ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {saving ? 'Saving…' : 'Save Credentials'}
+                  </button>
+                </form>
               </div>
-            )
-          })}
-        </div>
+            )}
+
+            {/* Step 05 — test */}
+            {step.isTest && (
+              <div className="px-5 pb-5" style={{ borderTop: '1px solid #2a2a2a', paddingTop: 16 }}>
+                <form onSubmit={handleTest} className="flex gap-3">
+                  <input
+                    type="tel"
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder="+92 300 0000000"
+                    value={testPhone}
+                    onChange={e => setTestPhone(e.target.value)}
+                    onFocus={e => (e.currentTarget.style.borderColor = '#C9A84C')}
+                    onBlur={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
+                  />
+                  <button
+                    type="submit"
+                    disabled={testing || !testPhone}
+                    className="px-4 py-2.5 rounded-lg text-sm font-sans font-semibold flex items-center gap-2 shrink-0"
+                    style={{ background: '#C9A84C', color: '#070707', opacity: testing || !testPhone ? 0.5 : 1, cursor: testing || !testPhone ? 'not-allowed' : 'pointer' }}
+                  >
+                    <Send size={14} />
+                    {testing ? 'Sending…' : 'Send Test'}
+                  </button>
+                </form>
+                {testResult === 'success' && (
+                  <p className="text-xs font-sans mt-2" style={{ color: '#4ade80' }}>✓ Test message sent successfully!</p>
+                )}
+                {testResult === 'error' && (
+                  <p className="text-xs font-sans mt-2" style={{ color: '#f87171' }}>✗ Test failed — check your credentials</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* FAQ */}
-      <div>
-        <h2 className="text-xs font-sans font-medium uppercase tracking-widest mb-6" style={{ color: '#C9A84C', letterSpacing: '0.12em' }}>
-          FAQ
-        </h2>
-        <div className="flex flex-col gap-4">
-          {FAQ.map((item, i) => (
-            <div key={i} className="p-5 rounded-xl" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
-              <p className="text-sm font-sans font-semibold mb-2" style={{ color: '#F0EBE1' }}>{item.q}</p>
-              <p className="text-sm font-sans leading-relaxed" style={{ color: '#6b6b6b' }}>{item.a}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* CTA */}
-      <div className="mt-10 p-6 rounded-xl text-center" style={{ background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.15)' }}>
-        <p className="text-sm font-sans font-semibold mb-1" style={{ color: '#F0EBE1' }}>Ready to connect?</p>
-        <p className="text-xs font-sans mb-4" style={{ color: '#6b6b6b' }}>Head to Integrations to complete the WhatsApp connection.</p>
-        <Link
-          href="/dashboard/settings"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-sans font-semibold"
-          style={{ background: '#C9A84C', color: '#070707', textDecoration: 'none' }}
-        >
-          Go to Integrations
-        </Link>
+      {/* Timeline note */}
+      <div className="mt-8 p-5 rounded-xl" style={{ background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.15)' }}>
+        <p className="text-xs font-sans uppercase tracking-widest mb-2" style={{ color: '#C9A84C' }}>Expected Timeline</p>
+        <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
+          Meta API access review typically takes <strong style={{ color: '#F0EBE1' }}>1–7 business days</strong> after business verification is complete.
+        </p>
       </div>
     </div>
   )
