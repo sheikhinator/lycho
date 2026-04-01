@@ -40,21 +40,22 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
   })
 
   const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
-  console.log('Response length:', raw.length)
-  console.log('Preview:', raw.substring(0, 100))
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  console.log('Response length:', cleaned.length)
+  console.log('Preview:', cleaned.substring(0, 100))
 
   let agents: AnyAgent[] = []
 
   for (const fn of [
-    () => JSON.parse(raw),
-    () => JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] ?? ''),
-    () => JSON.parse(raw.substring(raw.indexOf('['), raw.lastIndexOf(']') + 1)),
+    () => JSON.parse(cleaned),
+    () => JSON.parse(cleaned.match(/\[[\s\S]*\]/)?.[0] ?? ''),
+    () => JSON.parse(cleaned.substring(cleaned.indexOf('['), cleaned.lastIndexOf(']') + 1)),
   ]) {
     try { agents = fn(); break } catch { continue }
   }
 
   if (!agents.length) {
-    console.error('Parse failed. Raw:', raw)
+    console.error('Parse failed. Raw:', cleaned)
     throw new Error('Could not parse Claude response')
   }
 
