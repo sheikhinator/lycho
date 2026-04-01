@@ -14,12 +14,12 @@ export async function POST(request: Request) {
   if (!checkSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  runAutonomousForge().catch(e => console.error('Forge background error:', e))
-  return NextResponse.json({
-    success: true,
-    message: 'Forge is running in background. Check queue in 30 seconds.',
-    agents_queued: 'pending',
-  })
+
+  runAutonomousForge()
+    .then(r => console.log('Forge completed:', r))
+    .catch(e => console.error('Forge failed:', e.message))
+
+  return NextResponse.json({ success: true, message: 'Forge running — check queue in 30 seconds' })
 }
 
 // GET — Vercel cron job endpoint
@@ -27,6 +27,10 @@ export async function GET(request: Request) {
   if (!checkSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  runAutonomousForge().catch(e => console.error('Forge background error:', e))
-  return NextResponse.json({ success: true, message: 'Forge running in background' })
+
+  runAutonomousForge()
+    .then(r => console.log('Forge completed:', r))
+    .catch(e => console.error('Forge failed:', e.message))
+
+  return NextResponse.json({ success: true, message: 'Forge running — check queue in 30 seconds' })
 }
