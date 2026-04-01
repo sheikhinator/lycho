@@ -25,10 +25,10 @@ body {
 }
 
 @keyframes scanline {
-  0%   { opacity: 0; transform: translateX(-100%); }
-  20%  { opacity: 0.25; }
-  80%  { opacity: 0.25; }
-  100% { opacity: 0; transform: translateX(100%); }
+  0%   { left: -160px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
 }
 
 @keyframes shimmer {
