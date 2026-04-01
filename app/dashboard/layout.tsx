@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { createAdminClient } from '@/lib/supabase'
 import { SidebarProvider } from '@/components/providers/SidebarContext'
@@ -14,8 +13,6 @@ export default async function DashboardLayout({
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const headersList = await headers()
-  const currentPath = headersList.get('x-current-path') ?? ''
 
   const { data: userRow } = await admin
     .from('users')
@@ -23,7 +20,7 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single()
 
-  if (userRow?.tenant_id && currentPath !== '/dashboard/activate') {
+  if (userRow?.tenant_id) {
     const { data: tenant } = await admin
       .from('tenants')
       .select('plan_status, business_email')
@@ -33,9 +30,9 @@ export default async function DashboardLayout({
     const planStatus = tenant?.plan_status
     const masterEmail = process.env.MASTER_EMAIL
     const isMaster = masterEmail && tenant?.business_email === masterEmail
-    // Enterprise accounts and master email bypass all paywall checks
+
     if (!isMaster && planStatus !== 'enterprise' && (planStatus === 'pending' || planStatus === 'expired')) {
-      redirect('/dashboard/activate')
+      redirect('/activate')
     }
   }
 
