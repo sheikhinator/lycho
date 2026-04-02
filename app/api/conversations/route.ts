@@ -3,13 +3,7 @@ import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { canReceiveMessage } from '@/lib/plan-limits'
 import { sanitiseInput } from '@/lib/sanitise'
 import { callClaude, getModel } from '@/lib/claude'
-import { buildIntakeSystemPrompt, type ContactProfile } from '@/lib/agents/intake-agent'
-import { buildResearchSystemPrompt }    from '@/lib/agents/research-agent'
-import { buildOperationsSystemPrompt }  from '@/lib/agents/operations-agent'
-import { buildClientSystemPrompt }      from '@/lib/agents/client-agent'
-import { buildAnalystSystemPrompt }     from '@/lib/agents/analyst-agent'
-import { buildComplianceSystemPrompt }  from '@/lib/agents/compliance-agent'
-import { buildContentSystemPrompt }     from '@/lib/agents/content-agent'
+import { getSystemPrompt, COMPLEX_CORE } from '@/lib/agents/get-system-prompt'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
@@ -18,31 +12,12 @@ import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 import { createNotification } from '@/lib/notifications/notification-service'
 
-// ─── Agent routing helpers ────────────────────────────────────────────────────
-
-/** Strip optional _agent suffix so 'intake_agent' and 'intake' both match */
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
 }
 
-const COMPLEX_AGENTS = ['research', 'analyst', 'compliance']
-
 function getAgentComplexity(agentType: string): 'simple' | 'complex' {
-  return COMPLEX_AGENTS.includes(normaliseType(agentType)) ? 'complex' : 'simple'
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSystemPrompt(agentType: string, tenant: any, agent: any, existingProfile?: ContactProfile | null): string {
-  switch (normaliseType(agentType)) {
-    case 'research':   return buildResearchSystemPrompt(tenant, agent)
-    case 'operations': return buildOperationsSystemPrompt(tenant, agent)
-    case 'client':     return buildClientSystemPrompt(tenant, agent)
-    case 'analyst':    return buildAnalystSystemPrompt(tenant, agent)
-    case 'compliance': return buildComplianceSystemPrompt(tenant, agent)
-    case 'content':    return buildContentSystemPrompt(tenant, agent)
-    case 'intake':
-    default:           return buildIntakeSystemPrompt(tenant, agent, existingProfile)
-  }
+  return COMPLEX_CORE.has(normaliseType(agentType)) ? 'complex' : 'simple'
 }
 
 // GET /api/conversations — filtered list for tenant
@@ -231,29 +206,19 @@ export async function POST(req: NextRequest) {
     extraContext += `EMOTIONAL CONTEXT: Customer appears ${emotion.state} (intensity: ${emotion.intensity.toFixed(1)}). Tone: ${emotion.recommended_tone}. Start with: "${emotion.opening_acknowledgement}"\n\n`
   }
 
-  let basePrompt = getSystemPrompt(agent.agent_type, tenant, agent, hasProfile ? existingProfile : null)
-  let model = getModel(getAgentComplexity(agent.agent_type))
-
-  // For non-core agents, look up system_prompt from marketplace_agents
-  const CORE_TYPES = ['intake', 'research', 'operations', 'client', 'analyst', 'compliance', 'content']
-  if (!CORE_TYPES.includes(normaliseType(agent.agent_type))) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: mAgent } = await (supabase as any)
-      .from('marketplace_agents')
-      .select('system_prompt, model_complexity')
-      .eq('agent_type', agent.agent_type)
-      .single()
-    if (mAgent?.system_prompt) {
-      basePrompt = mAgent.system_prompt as string
-      model = getModel(mAgent.model_complexity as 'simple' | 'complex')
-    }
-  }
+  const { prompt: basePrompt, model: promptModel } = await getSystemPrompt(
+    agent.agent_type,
+    supabase,
+    tenant,
+    agent,
+    hasProfile ? existingProfile : null,
+  )
+  let model = getModel(promptModel)
 
   const systemPrompt = extraContext ? `${basePrompt}\n\n${extraContext}` : basePrompt
 
   // 6. Call Claude — complex agents use Sonnet, simple use Haiku
-  const complexity = getAgentComplexity(agent.agent_type)
-  const maxTokens = complexity === 'complex' ? 900 : 600
+  const maxTokens = promptModel === 'complex' ? 900 : 600
   let claudeResult
   try {
     claudeResult = await callClaude({

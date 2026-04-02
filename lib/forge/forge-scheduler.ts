@@ -18,6 +18,22 @@ Generate 3 agents for Pakistani/GCC businesses. Real problems only. Return array
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyAgent = Record<string, any>
 
+async function testAgentPrompt(anthropic: Anthropic, prompt: string, agentType: string): Promise<boolean> {
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 100,
+      system: prompt,
+      messages: [{ role: 'user', content: 'Hello, can you help me?' }],
+    })
+    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+    return reply.length > 20 && !reply.toLowerCase().includes('error')
+  } catch {
+    console.log('Test failed for:', agentType)
+    return false
+  }
+}
+
 export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
   console.log('=== FORGE START ===', new Date().toISOString())
 
@@ -63,8 +79,21 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
     a.agent_type && a.display_name && !existingTypes.includes(a.agent_type)
   )
 
-  let inserted = 0
+  // Self-test each agent before queuing
+  const tested: AnyAgent[] = []
   for (const agent of novel) {
+    console.log('Testing:', agent.agent_type)
+    const passes = await testAgentPrompt(anthropic, agent.system_prompt, agent.agent_type)
+    if (passes) {
+      tested.push(agent)
+      console.log('✅ Passed:', agent.agent_type)
+    } else {
+      console.log('❌ Failed test:', agent.agent_type)
+    }
+  }
+
+  let inserted = 0
+  for (const agent of tested) {
     const { error } = await supabaseAdmin.from('forge_queue').insert({
       agent_type:           agent.agent_type,
       display_name:         agent.display_name,
