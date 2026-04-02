@@ -260,12 +260,11 @@ async function executeOrionTool(name: string, input: Record<string, any>): Promi
       return JSON.stringify({ agent_type: data.agent_type, score: data.intelligence_score, version: data.version, performance: data.performance_data, prompt_preview: (data.optimised_prompt || '').slice(0, 300) + '...' }, null, 2)
     }
     case 'initialize_core_agents': {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/initialize`, {
-        method: 'POST',
-        headers: { 'x-master-secret': process.env.MASTER_SECRET! }
-      })
-      const json = await res.json()
-      return `Initialized ${json.initialized}/7 core agents. ${json.results?.filter((r: Record<string,string>) => r.status === 'failed').map((r: Record<string,string>) => `${r.agent}: ${r.error}`).join(', ') || 'All successful.'}`
+      const { injectIntelligence } = await import('@/lib/orion/orion-engine')
+      const CORE = ['intake', 'research', 'operations', 'client', 'analyst', 'compliance', 'content']
+      const res = await Promise.allSettled(CORE.map(t => injectIntelligence(t, 'PK')))
+      const ok = res.filter(r => r.status === 'fulfilled').length
+      return `Initialized ${ok}/7 core agents directly. ${ok === 7 ? 'All successful.' : 'Some failed — check logs.'}`
     }
     case 'seed_countries': {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/seed-countries`, {

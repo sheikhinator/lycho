@@ -11,20 +11,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const results = []
-  for (const agentType of CORE_AGENTS) {
-    try {
+  const results = await Promise.allSettled(
+    CORE_AGENTS.map(async (agentType) => {
       const prompt = await injectIntelligence(agentType, 'PK')
-      results.push({ agent: agentType, status: 'initialized', prompt_length: prompt.length })
-    } catch(e: unknown) {
-      const err = e as Error
-      results.push({ agent: agentType, status: 'failed', error: err.message })
-    }
-  }
+      return { agent: agentType, status: 'initialized', prompt_length: prompt.length }
+    })
+  )
+
+  const mapped = results.map((r, i) =>
+    r.status === 'fulfilled'
+      ? r.value
+      : { agent: CORE_AGENTS[i], status: 'failed', error: (r.reason as Error).message }
+  )
 
   return NextResponse.json({
     success: true,
-    initialized: results.filter(r => r.status === 'initialized').length,
-    results
+    initialized: mapped.filter(r => r.status === 'initialized').length,
+    results: mapped
   })
 }
