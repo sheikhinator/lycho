@@ -28,13 +28,13 @@ export async function POST(request: Request) {
         .upsert({
           country_code: profile.country_code,
           country_name: profile.country_name,
-          currency: profile.currency,
-          primary_language: profile.primary_language,
-          secondary_languages: profile.secondary_languages,
-          timezone: profile.timezone,
-          regulatory_context: profile.regulatory_context,
-          market_context: profile.market_context,
-          agent_injection: profile.agent_injection,
+          currency: profile.currency ?? '',
+          primary_language: profile.primary_language ?? '',
+          secondary_languages: profile.secondary_languages ?? [],
+          timezone: profile.timezone ?? '',
+          regulatory_context: (profile.regulatory_context ?? '').slice(0, 5000),
+          market_context: (profile.market_context ?? '').slice(0, 5000),
+          agent_injection: (profile.agent_injection ?? '').slice(0, 3000),
           last_updated_at: new Date().toISOString()
         }, { onConflict: 'country_code' })
 

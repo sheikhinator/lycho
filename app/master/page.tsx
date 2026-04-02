@@ -570,7 +570,7 @@ export default function MasterPanel() {
                 <div style={{color:entityColors[chatEntity],fontWeight:900,fontSize:14,letterSpacing:1}}>COMMAND CENTER</div>
                 <div style={{color:'#444',fontSize:11,marginTop:2}}>Direct line to your intelligence systems</div>
               </div>
-              <button onClick={()=>setChatOpen(false)} style={{background:'transparent',border:'none',color:'#666',fontSize:18,cursor:'pointer',lineHeight:1}}>×</button>
+              <button onClick={()=>setChatOpen(false)} style={{background:'transparent',border:'1px solid #2a2a2a',borderRadius:6,color:'#888',fontSize:12,cursor:'pointer',padding:'4px 10px',display:'flex',alignItems:'center',gap:4}}>← Back</button>
             </div>
             {/* Entity selector */}
             <div style={{padding:'12px 20px',borderBottom:'1px solid #111',display:'flex',gap:8}}>
