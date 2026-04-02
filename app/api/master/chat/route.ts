@@ -61,6 +61,11 @@ const orionTools: Anthropic.Tool[] = [
     input_schema: { type: 'object' as const, properties: {}, required: [] }
   },
   {
+    name: 'initialize_core_agents',
+    description: 'Initialize all 7 core agent types (intake, research, operations, client, analyst, compliance, content) in the Orion intelligence store with optimised prompts',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
     name: 'apply_geo_to_tenant',
     description: 'Apply geo-intelligence for a specific country to all agents of a tenant',
     input_schema: {
@@ -253,6 +258,14 @@ async function executeOrionTool(name: string, input: Record<string, any>): Promi
         .single()
       if (!data) return `No intelligence data found for ${input.agent_type}.`
       return JSON.stringify({ agent_type: data.agent_type, score: data.intelligence_score, version: data.version, performance: data.performance_data, prompt_preview: (data.optimised_prompt || '').slice(0, 300) + '...' }, null, 2)
+    }
+    case 'initialize_core_agents': {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/initialize`, {
+        method: 'POST',
+        headers: { 'x-master-secret': process.env.MASTER_SECRET! }
+      })
+      const json = await res.json()
+      return `Initialized ${json.initialized}/7 core agents. ${json.results?.filter((r: Record<string,string>) => r.status === 'failed').map((r: Record<string,string>) => `${r.agent}: ${r.error}`).join(', ') || 'All successful.'}`
     }
     case 'seed_countries': {
       const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/seed-countries`, {
