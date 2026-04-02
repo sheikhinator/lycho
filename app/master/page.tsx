@@ -560,17 +560,16 @@ export default function MasterPanel() {
         )}
       </div>
 
-      {/* COMMAND CENTER CHAT MODAL */}
+      {/* COMMAND CENTER CHAT PANEL */}
       {chatOpen && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',justifyContent:'flex-end',padding:24,zIndex:1000}}>
-          <div style={{width:480,height:620,background:'#0d0d0d',border:`1px solid ${entityColors[chatEntity]}33`,borderRadius:16,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{position:'fixed',top:0,right:0,width:480,height:'100vh',background:'#0d0d0d',borderLeft:`1px solid ${entityColors[chatEntity]}33`,display:'flex',flexDirection:'column',overflow:'hidden',zIndex:1000}}>
             {/* Header */}
-            <div style={{padding:'16px 20px',borderBottom:'1px solid #1a1a1a',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{padding:'16px 20px',borderBottom:'1px solid #1a1a1a',display:'flex',alignItems:'center',justifyContent:'space-between',position:'relative'}}>
               <div>
                 <div style={{color:entityColors[chatEntity],fontWeight:900,fontSize:14,letterSpacing:1}}>COMMAND CENTER</div>
                 <div style={{color:'#444',fontSize:11,marginTop:2}}>Direct line to your intelligence systems</div>
               </div>
-              <button onClick={()=>setChatOpen(false)} style={{background:'transparent',border:'1px solid #2a2a2a',borderRadius:6,color:'#888',fontSize:12,cursor:'pointer',padding:'4px 10px',display:'flex',alignItems:'center',gap:4}}>← Back</button>
+              <button onClick={()=>setChatOpen(false)} style={{position:'absolute',top:12,right:12,background:'transparent',border:'none',color:'#666',fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
             </div>
             {/* Entity selector */}
             <div style={{padding:'12px 20px',borderBottom:'1px solid #111',display:'flex',gap:8}}>
@@ -635,7 +634,6 @@ export default function MasterPanel() {
                 Send
               </button>
             </div>
-          </div>
         </div>
       )}
     </div>
