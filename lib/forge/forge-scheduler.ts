@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
+import { generateForgeBrief } from '@/lib/orion/forge-collaboration'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,12 +47,21 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+  // Get Orion brief to guide generation
+  let orionBrief = ''
+  try {
+    orionBrief = await generateForgeBrief()
+    console.log('Orion brief generated for Forge')
+  } catch(e) {
+    console.error('Orion brief failed (non-critical):', e)
+  }
+
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1500,
     messages: [{
       role: 'user',
-      content: `${FORGE_PROMPT}\n\nAvoid these existing types: ${existingTypes.slice(0, 20).join(', ') || 'none'}`,
+      content: `${FORGE_PROMPT}\n\nORION INTELLIGENCE BRIEF:\n${orionBrief || 'No brief available — use market research'}\n\nAvoid these existing types: ${existingTypes.slice(0, 20).join(', ') || 'none'}`,
     }],
   })
 

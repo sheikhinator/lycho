@@ -62,5 +62,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ queue: data || [] })
   }
 
+  if (section === 'orion') {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const [intelligence, log, councils] = await Promise.all([
+      supabase.from('orion_agent_intelligence').select('*').order('intelligence_score', { ascending: true }),
+      supabase.from('orion_optimisation_log').select('*').gte('created_at', weekAgo).order('created_at', { ascending: false }).limit(20),
+      supabase.from('orion_council_sessions').select('*').gte('created_at', dayAgo)
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agents: any[] = intelligence.data || []
+    const avgScore = agents.length
+      ? Math.round(agents.reduce((s: number, a: any) => s + (a.intelligence_score || 0), 0) / agents.length)
+      : 0
+    return NextResponse.json({
+      total_agents: agents.length,
+      avg_score: avgScore,
+      optimisations_week: log.data?.length || 0,
+      underperforming: agents.filter((a: any) => a.intelligence_score < 60),
+      optimisation_log: log.data || [],
+      council_sessions_today: councils.data?.length || 0,
+      country_distribution: {},
+      all_agents: agents
+    })
+  }
+
   return NextResponse.json({})
 }

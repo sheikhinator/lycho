@@ -11,6 +11,8 @@ import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib
 import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 import { createNotification } from '@/lib/notifications/notification-service'
+import { injectIntelligence, scoreConversation } from '@/lib/orion/orion-engine'
+import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
 
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
@@ -206,6 +208,14 @@ export async function POST(req: NextRequest) {
     extraContext += `EMOTIONAL CONTEXT: Customer appears ${emotion.state} (intensity: ${emotion.intensity.toFixed(1)}). Tone: ${emotion.recommended_tone}. Start with: "${emotion.opening_acknowledgement}"\n\n`
   }
 
+  // 5d. Get tenant country for Orion geo-intelligence
+  const { data: geoSettings } = await supabase
+    .from('tenant_geo_settings')
+    .select('country_code')
+    .eq('tenant_id', tenantId)
+    .single()
+  const countryCode = (geoSettings as { country_code?: string } | null)?.country_code || (tenant as unknown as Record<string, string>).country || 'PK'
+
   const { prompt: basePrompt, model: promptModel } = await getSystemPrompt(
     agent.agent_type,
     supabase,
@@ -215,25 +225,62 @@ export async function POST(req: NextRequest) {
   )
   let model = getModel(promptModel)
 
-  const systemPrompt = extraContext ? `${basePrompt}\n\n${extraContext}` : basePrompt
-
-  // 6. Call Claude — complex agents use Sonnet, simple use Haiku
+  // 6. Check if Agent Council needed, else use Orion-injected prompt
+  const complexity = detectComplexity(body.message)
   const maxTokens = promptModel === 'complex' ? 900 : 600
   let claudeResult
-  try {
-    claudeResult = await callClaude({
-      systemPrompt,
-      messages,
-      model,
-      maxTokens,
-      useCache: true,
-    })
-  } catch (e) {
-    return err('AI service temporarily unavailable. Please try again.', 'AI_ERROR', 503)
+  let agentResponse: string
+  let modelUsed: string
+
+  if (complexity.needsCouncil && complexity.suggestedAgents.length > 1) {
+    try {
+      const council = await conveneCouncil(
+        tenantId,
+        (conversation!.id as string),
+        body.message,
+        complexity.suggestedAgents,
+        countryCode,
+        priorMessages
+      )
+      agentResponse = council.response
+      modelUsed = 'orion-council'
+      claudeResult = { response: agentResponse, tokensUsed: 0, model: modelUsed, estimatedCostPkr: 0 }
+    } catch {
+      // Fallback to single agent
+      complexity.needsCouncil = false
+    }
+  }
+
+  if (!complexity.needsCouncil || complexity.suggestedAgents.length <= 1) {
+    // Get Orion-optimised prompt (falls back to base prompt if Orion unavailable)
+    let orionPrompt = basePrompt
+    try {
+      orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt)
+    } catch { /* non-critical */ }
+
+    const systemPrompt = extraContext ? `${orionPrompt}\n\n${extraContext}` : orionPrompt
+    try {
+      claudeResult = await callClaude({
+        systemPrompt,
+        messages,
+        model,
+        maxTokens,
+        useCache: true,
+      })
+    } catch (e) {
+      return err('AI service temporarily unavailable. Please try again.', 'AI_ERROR', 503)
+    }
+    agentResponse = claudeResult!.response
+    modelUsed = claudeResult!.model
+  }
+
+  // Reassign claudeResult for downstream use
+  if (!claudeResult) {
+    return err('AI service temporarily unavailable.', 'AI_ERROR', 503)
   }
 
   // 7. Extract metadata and clean response
-  const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult.response)
+  const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult!.response)
 
   // 7b. Update contact memory graph (non-fatal)
   await updateContactMemory(
@@ -284,7 +331,7 @@ export async function POST(req: NextRequest) {
       confidence_score: confidence,
       escalated_to: escalated ? 'human' : null,
       status: escalated ? 'escalated' : 'open',
-      tokens_used: ((conversation!.tokens_used as number) || 0) + claudeResult.tokensUsed,
+      tokens_used: ((conversation!.tokens_used as number) || 0) + claudeResult!.tokensUsed,
       metadata: {
         contact_profile:       updatedProfile,
         lead_score:            leadScore,
@@ -406,6 +453,14 @@ export async function POST(req: NextRequest) {
     void dispatchTrigger(tenantId, 'sentiment.excited', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
   }
 
+  // 13c. Score conversation for Orion (non-blocking)
+  scoreConversation(agent.agent_type, messages, {
+    escalated,
+    lead_score: leadScore,
+    sentiment: metadata?.sentiment ?? 'neutral',
+    resolved: false
+  }).catch(e => console.error('Orion scoring error:', e))
+
   // 14. Message audit log
   await auditLog(supabase, {
     tenantId,
@@ -414,9 +469,9 @@ export async function POST(req: NextRequest) {
     resourceType: 'conversation',
     resourceId: conversation!.id as string,
     metadata: {
-      model: claudeResult.model,
-      tokens: claudeResult.tokensUsed,
-      cost_pkr: claudeResult.estimatedCostPkr,
+      model: claudeResult!.model,
+      tokens: claudeResult!.tokensUsed,
+      cost_pkr: claudeResult!.estimatedCostPkr,
       confidence,
       escalated,
       lead_score: leadScore,
@@ -429,9 +484,9 @@ export async function POST(req: NextRequest) {
     response:              cleanResponse,
     confidence,
     escalated,
-    model_used:            claudeResult.model,
-    tokens_used:           claudeResult.tokensUsed,
-    cost_pkr:              claudeResult.estimatedCostPkr,
+    model_used:            claudeResult!.model,
+    tokens_used:           claudeResult!.tokensUsed,
+    cost_pkr:              claudeResult!.estimatedCostPkr,
     lead_score:            leadScore,
     lead_label:            getLeadLabel(leadScore),
     sentiment:             metadata?.sentiment || 'neutral',

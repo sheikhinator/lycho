@@ -1,8 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
-const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'payments', 'waitlist'] as const
+const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'orion', 'payments', 'waitlist'] as const
 type Section = typeof SECTIONS[number]
+
+type ChatEntity = 'orion' | 'forge' | 'nexus'
+interface ChatMessage { role: 'user' | 'assistant'; content: string; entity?: string }
 
 export default function MasterPanel() {
   const [authed, setAuthed] = useState(false)
@@ -15,6 +18,15 @@ export default function MasterPanel() {
   const [forgeResult, setForgeResult] = useState('')
   const [nexusLoading, setNexusLoading] = useState(false)
   const [nexusResult, setNexusResult] = useState('')
+  const [orionLoading, setOrionLoading] = useState(false)
+  const [orionResult, setOrionResult] = useState('')
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatEntity, setChatEntity] = useState<ChatEntity>('orion')
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const saved = sessionStorage.getItem('lycho_master')
@@ -74,17 +86,14 @@ export default function MasterPanel() {
         method: 'POST',
         headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
       })
-
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No response body')
-
       let chunks = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         chunks += new TextDecoder().decode(value)
       }
-
       const json = JSON.parse(chunks)
       if (json.success) {
         setForgeResult(`✅ ${json.agents_queued} agents queued — refreshing...`)
@@ -99,12 +108,86 @@ export default function MasterPanel() {
     setForgeLoading(false)
   }
 
+  async function runOrionOptimise() {
+    setOrionLoading(true)
+    setOrionResult('⏳ Orion optimisation running...')
+    try {
+      const res = await fetch('/api/orion/optimise', {
+        method: 'POST',
+        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+      })
+      const json = await res.json()
+      if (json.success) {
+        setOrionResult(`✅ ${json.optimised} agents optimised`)
+        loadSection('orion')
+      } else {
+        setOrionResult(`❌ ${json.error}`)
+      }
+    } catch(e: unknown) {
+      const err = e as { message?: string }
+      setOrionResult(`❌ ${err.message}`)
+    }
+    setOrionLoading(false)
+  }
+
+  async function seedCountries() {
+    setOrionResult('⏳ Seeding countries...')
+    try {
+      const res = await fetch('/api/orion/seed-countries', {
+        method: 'POST',
+        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+      })
+      const json = await res.json()
+      setOrionResult(json.success ? `✅ ${json.seeded}/${json.total} countries seeded` : `❌ ${json.error}`)
+    } catch(e: unknown) {
+      const err = e as { message?: string }
+      setOrionResult(`❌ ${err.message}`)
+    }
+  }
+
+  async function sendChat() {
+    if (!chatInput.trim() || chatLoading) return
+    const msg = chatInput.trim()
+    setChatInput('')
+    const userMsg: ChatMessage = { role: 'user', content: msg }
+    const newHistory = [...chatHistory, userMsg]
+    setChatHistory(newHistory)
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/master/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-master-secret': sessionStorage.getItem('lycho_master') || '' },
+        body: JSON.stringify({
+          entity: chatEntity,
+          message: msg,
+          history: newHistory.slice(-10).map(h => ({ role: h.role, content: h.content }))
+        })
+      })
+      const json = await res.json()
+      if (json.success) {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: json.reply, entity: json.entity }])
+      } else {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${json.error}`, entity: chatEntity.toUpperCase() }])
+      }
+    } catch {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Connection error.', entity: chatEntity.toUpperCase() }])
+    }
+    setChatLoading(false)
+  }
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory])
+
   useEffect(() => { if (authed) loadSection('dashboard') }, [authed])
 
   useEffect(() => {
     const interval = setInterval(() => loadSection(section), 30000)
     return () => clearInterval(interval)
   }, [section, authed])
+
+  const entityColors: Record<ChatEntity, string> = { orion: '#a78bfa', forge: '#f59e0b', nexus: '#34d399' }
+  const entityLabels: Record<ChatEntity, string> = { orion: 'ORION — Intelligence', forge: 'FORGE — Agent Builder', nexus: 'NEXUS — Automations' }
 
   if (!authed) return (
     <div style={{minHeight:'100vh',background:'#070707',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -126,7 +209,7 @@ export default function MasterPanel() {
   return (
     <div style={{minHeight:'100vh',background:'#070707',display:'flex',color:'#fff',fontFamily:'sans-serif'}}>
       {/* Sidebar */}
-      <div style={{width:220,background:'#0d0d0d',borderRight:'1px solid #1a1a1a',padding:'24px 0',flexShrink:0}}>
+      <div style={{width:220,background:'#0d0d0d',borderRight:'1px solid #1a1a1a',padding:'24px 0',flexShrink:0,display:'flex',flexDirection:'column'}}>
         <div style={{padding:'0 20px 24px',borderBottom:'1px solid #1a1a1a',marginBottom:16}}>
           <div style={{color:'#C9A84C',fontWeight:900,fontSize:18,letterSpacing:2}}>LYCHO</div>
           <div style={{color:'#444',fontSize:11,marginTop:2}}>MASTER PANEL</div>
@@ -136,10 +219,15 @@ export default function MasterPanel() {
             style={{padding:'10px 20px',cursor:'pointer',background:section===s?'rgba(201,168,76,0.08)':'transparent',
               borderLeft:section===s?'2px solid #C9A84C':'2px solid transparent',
               color:section===s?'#C9A84C':'#666',fontSize:13,textTransform:'capitalize',transition:'all 0.2s'}}>
-            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s.charAt(0).toUpperCase()+s.slice(1)}
+            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s === 'orion' ? 'Orion Intelligence' : s.charAt(0).toUpperCase()+s.slice(1)}
           </div>
         ))}
-        <div style={{padding:'10px 20px',marginTop:16,borderTop:'1px solid #1a1a1a'}}>
+        <div style={{marginTop:'auto',padding:'16px 20px',borderTop:'1px solid #1a1a1a'}}>
+          {/* Command Center Chat button */}
+          <div onClick={()=>setChatOpen(true)}
+            style={{cursor:'pointer',background:'rgba(167,139,250,0.1)',border:'1px solid rgba(167,139,250,0.3)',borderRadius:8,padding:'8px 12px',marginBottom:12,textAlign:'center',color:'#a78bfa',fontSize:12,fontWeight:700,letterSpacing:1}}>
+            COMMAND CENTER
+          </div>
           <div onClick={()=>{sessionStorage.clear();setAuthed(false)}}
             style={{cursor:'pointer',color:'#ef4444',fontSize:13}}>Logout</div>
         </div>
@@ -321,6 +409,99 @@ export default function MasterPanel() {
                 ))}
               </div>
             )}
+            {section === 'orion' && (
+              <div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:orionResult?12:24,flexWrap:'wrap',gap:12}}>
+                  <div>
+                    <h2 style={{color:'#a78bfa',fontSize:24,fontWeight:900,letterSpacing:1,margin:0}}>ORION COMMAND CENTER</h2>
+                    <p style={{color:'#555',fontSize:12,margin:'4px 0 0'}}>Autonomous intelligence layer — central nervous system of LYCHO</p>
+                  </div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={seedCountries} style={{background:'#1e1b4b',color:'#a78bfa',border:'1px solid #3730a3',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                      Seed Countries
+                    </button>
+                    <button onClick={runOrionOptimise} disabled={orionLoading}
+                      style={{background:orionLoading?'#3730a3':'#a78bfa',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:orionLoading?'not-allowed':'pointer'}}>
+                      {orionLoading ? 'Optimising…' : 'Run Optimisation Now'}
+                    </button>
+                  </div>
+                </div>
+                {orionResult && <p style={{color:orionResult.startsWith('✅')?'#34d399':'#ef4444',fontSize:13,marginBottom:16}}>{orionResult}</p>}
+                {/* Stats grid */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:16,marginBottom:32}}>
+                  {[
+                    {label:'Agents in Store', value:data.total_agents||0, color:'#a78bfa'},
+                    {label:'Avg Intelligence Score', value:`${data.avg_score||0}/100`, color:'#a78bfa'},
+                    {label:'Optimisations This Week', value:data.optimisations_week||0, color:'#a78bfa'},
+                    {label:'Council Sessions Today', value:data.council_sessions_today||0, color:'#a78bfa'},
+                    {label:'Countries Active', value:Object.keys(data.country_distribution||{}).length, color:'#a78bfa'},
+                    {label:'Underperforming', value:(data.underperforming||[]).length, color:'#ef4444'},
+                  ].map(k=>(
+                    <div key={k.label} style={{background:'#111',border:'1px solid #1a1a1a',borderRadius:8,padding:16}}>
+                      <div style={{color:'#444',fontSize:11,marginBottom:4}}>{k.label}</div>
+                      <div style={{color:k.color,fontSize:22,fontWeight:700}}>{k.value}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Underperforming agents */}
+                {(data.underperforming||[]).length > 0 && (
+                  <div style={{marginBottom:32}}>
+                    <h3 style={{color:'#888',fontSize:14,marginBottom:12}}>UNDERPERFORMING AGENTS</h3>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead><tr>{['Agent Type','Score','Version','Last Optimised'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'8px 12px',color:'#444',fontSize:11,borderBottom:'1px solid #1a1a1a'}}>{h}</th>
+                      ))}</tr></thead>
+                      <tbody>{(data.underperforming||[]).map((a:any)=>(
+                        <tr key={a.agent_type} style={{borderBottom:'1px solid #111'}}>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#fff'}}>{a.agent_type}</td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#ef4444'}}>{a.intelligence_score}/100</td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#666'}}>v{a.version||1}</td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#444'}}>{a.last_optimised_at?new Date(a.last_optimised_at).toLocaleDateString():'-'}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
+                {/* All agents */}
+                {(data.all_agents||[]).length > 0 && (
+                  <div style={{marginBottom:32}}>
+                    <h3 style={{color:'#888',fontSize:14,marginBottom:12}}>ALL AGENTS IN INTELLIGENCE STORE</h3>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead><tr>{['Agent Type','Score','Version','Conversations','Optimised'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'8px 12px',color:'#444',fontSize:11,borderBottom:'1px solid #1a1a1a'}}>{h}</th>
+                      ))}</tr></thead>
+                      <tbody>{(data.all_agents||[]).map((a:any)=>(
+                        <tr key={a.agent_type} style={{borderBottom:'1px solid #111'}}>
+                          <td style={{padding:'10px 12px',fontSize:13}}>{a.agent_type}</td>
+                          <td style={{padding:'10px 12px',fontSize:13}}>
+                            <span style={{color:a.intelligence_score>=80?'#34d399':a.intelligence_score>=60?'#C9A84C':'#ef4444',fontWeight:600}}>{a.intelligence_score}</span>
+                          </td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#666'}}>v{a.version||1}</td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#666'}}>{a.performance_data?.total_conversations||0}</td>
+                          <td style={{padding:'10px 12px',fontSize:13,color:'#444'}}>{a.last_optimised_at?new Date(a.last_optimised_at).toLocaleDateString():'-'}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
+                {/* Optimisation log */}
+                {(data.optimisation_log||[]).length > 0 && (
+                  <div>
+                    <h3 style={{color:'#888',fontSize:14,marginBottom:12}}>RECENT OPTIMISATION LOG</h3>
+                    {(data.optimisation_log||[]).slice(0,10).map((log:any)=>(
+                      <div key={log.id} style={{background:'#111',border:'1px solid #1a1a1a',borderRadius:8,padding:16,marginBottom:8}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                          <span style={{color:'#fff',fontSize:13,fontWeight:600}}>{log.agent_type}</span>
+                          <span style={{color:'#666',fontSize:11}}>{new Date(log.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div style={{color:'#666',fontSize:12,marginBottom:4}}>{log.trigger_reason}</div>
+                        <div style={{color:'#a78bfa',fontSize:12}}>Score: {log.previous_score} → {log.new_score}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {section === 'payments' && (
               <div>
                 <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,marginBottom:24,letterSpacing:1}}>PAYMENTS</h2>
@@ -377,6 +558,85 @@ export default function MasterPanel() {
           </div>
         )}
       </div>
+
+      {/* COMMAND CENTER CHAT MODAL */}
+      {chatOpen && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',justifyContent:'flex-end',padding:24,zIndex:1000}}>
+          <div style={{width:480,height:620,background:'#0d0d0d',border:`1px solid ${entityColors[chatEntity]}33`,borderRadius:16,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            {/* Header */}
+            <div style={{padding:'16px 20px',borderBottom:'1px solid #1a1a1a',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <div style={{color:entityColors[chatEntity],fontWeight:900,fontSize:14,letterSpacing:1}}>COMMAND CENTER</div>
+                <div style={{color:'#444',fontSize:11,marginTop:2}}>Direct line to your intelligence systems</div>
+              </div>
+              <button onClick={()=>setChatOpen(false)} style={{background:'transparent',border:'none',color:'#666',fontSize:18,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            {/* Entity selector */}
+            <div style={{padding:'12px 20px',borderBottom:'1px solid #111',display:'flex',gap:8}}>
+              {(['orion','forge','nexus'] as ChatEntity[]).map(e=>(
+                <button key={e} onClick={()=>{setChatEntity(e);setChatHistory([])}}
+                  style={{flex:1,background:chatEntity===e?`${entityColors[e]}15`:'transparent',border:`1px solid ${chatEntity===e?entityColors[e]:'#222'}`,borderRadius:8,padding:'6px 8px',color:chatEntity===e?entityColors[e]:'#555',fontSize:11,fontWeight:700,cursor:'pointer',letterSpacing:1}}>
+                  {e.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            {/* Entity label */}
+            <div style={{padding:'8px 20px',background:`${entityColors[chatEntity]}08`}}>
+              <span style={{color:entityColors[chatEntity],fontSize:11,fontWeight:600}}>{entityLabels[chatEntity]}</span>
+            </div>
+            {/* Messages */}
+            <div style={{flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:12}}>
+              {chatHistory.length === 0 && (
+                <div style={{color:'#333',fontSize:13,textAlign:'center',marginTop:40}}>
+                  <div style={{color:entityColors[chatEntity],fontSize:28,marginBottom:8}}>◈</div>
+                  <div>Speak to {chatEntity.toUpperCase()} directly.</div>
+                  <div style={{marginTop:4,fontSize:12}}>Ask about diagnostics, operations, performance,</div>
+                  <div style={{fontSize:12}}>or issue commands to act immediately.</div>
+                </div>
+              )}
+              {chatHistory.map((msg, i) => (
+                <div key={i} style={{display:'flex',flexDirection:'column',alignItems:msg.role==='user'?'flex-end':'flex-start'}}>
+                  {msg.role === 'assistant' && (
+                    <div style={{color:entityColors[chatEntity],fontSize:10,fontWeight:700,marginBottom:4,letterSpacing:1}}>{msg.entity || chatEntity.toUpperCase()}</div>
+                  )}
+                  <div style={{
+                    maxWidth:'85%',padding:'10px 14px',borderRadius:12,fontSize:13,lineHeight:1.5,
+                    background:msg.role==='user'?'#1a1a1a':`${entityColors[chatEntity]}10`,
+                    color:msg.role==='user'?'#ccc':'#e5e7eb',
+                    border:msg.role==='assistant'?`1px solid ${entityColors[chatEntity]}20`:'1px solid #222'
+                  }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start'}}>
+                  <div style={{color:entityColors[chatEntity],fontSize:10,fontWeight:700,marginBottom:4,letterSpacing:1}}>{chatEntity.toUpperCase()}</div>
+                  <div style={{background:`${entityColors[chatEntity]}10`,border:`1px solid ${entityColors[chatEntity]}20`,borderRadius:12,padding:'10px 14px',color:entityColors[chatEntity],fontSize:13}}>
+                    <span style={{opacity:0.7}}>Processing...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            {/* Input */}
+            <div style={{padding:'12px 20px',borderTop:'1px solid #111',display:'flex',gap:8}}>
+              <input
+                value={chatInput}
+                onChange={e=>setChatInput(e.target.value)}
+                onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat()} }}
+                placeholder={`Message ${chatEntity.toUpperCase()}...`}
+                disabled={chatLoading}
+                style={{flex:1,background:'#0a0a0a',border:`1px solid #222`,borderRadius:8,padding:'10px 14px',color:'#fff',fontSize:13,outline:'none'}}
+              />
+              <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()}
+                style={{background:entityColors[chatEntity],color:'#070707',border:'none',borderRadius:8,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:chatLoading||!chatInput.trim()?'not-allowed':'pointer',opacity:chatLoading||!chatInput.trim()?0.5:1}}>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
