@@ -165,7 +165,8 @@ export default function MasterPanel() {
       })
       const json = await res.json()
       if (json.success) {
-        setChatHistory(prev => [...prev, { role: 'assistant', content: json.reply, entity: json.entity }])
+        const actionLog = json.actions_taken?.length ? `\n\n⚡ Actions executed:\n${json.actions_taken.join('\n')}` : ''
+        setChatHistory(prev => [...prev, { role: 'assistant', content: json.reply + actionLog, entity: json.entity }])
       } else {
         setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${json.error}`, entity: chatEntity.toUpperCase() }])
       }

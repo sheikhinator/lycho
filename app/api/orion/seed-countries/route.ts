@@ -1,8 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { COUNTRY_PROFILES } from '@/lib/orion/country-profiles'
-
-export const dynamic = 'force-dynamic'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,20 +8,54 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-master-secret')
+export const dynamic = 'force-dynamic'
+
+export async function POST(request: Request) {
+  const secret = request.headers.get('x-master-secret')
   if (!secret || secret !== process.env.MASTER_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let seeded = 0
-  for (const profile of COUNTRY_PROFILES) {
-    const { error } = await supabaseAdmin
-      .from('country_profiles')
-      .upsert(profile, { onConflict: 'country_code' })
-    if (!error) seeded++
-    else console.error('Seed error for', profile.country_code, error.message)
-  }
+  try {
+    console.log('Seeding', COUNTRY_PROFILES.length, 'countries')
 
-  return NextResponse.json({ success: true, seeded, total: COUNTRY_PROFILES.length })
+    let seeded = 0
+    const errors = []
+
+    for (const profile of COUNTRY_PROFILES) {
+      const { error } = await supabaseAdmin
+        .from('country_profiles')
+        .upsert({
+          country_code: profile.country_code,
+          country_name: profile.country_name,
+          currency: profile.currency,
+          primary_language: profile.primary_language,
+          secondary_languages: profile.secondary_languages,
+          timezone: profile.timezone,
+          regulatory_context: profile.regulatory_context,
+          market_context: profile.market_context,
+          agent_injection: profile.agent_injection,
+          last_updated_at: new Date().toISOString()
+        }, { onConflict: 'country_code' })
+
+      if (error) {
+        console.error('Failed to seed', profile.country_code, ':', error.message)
+        errors.push({ country: profile.country_code, error: error.message })
+      } else {
+        console.log('Seeded:', profile.country_code)
+        seeded++
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      seeded,
+      total: COUNTRY_PROFILES.length,
+      errors
+    })
+  } catch (e: unknown) {
+    const err = e as Error
+    console.error('Seed error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

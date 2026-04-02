@@ -12,77 +12,473 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const IDENTITIES: Record<string, { name: string; system: string }> = {
-  orion: {
-    name: 'ORION',
-    system: `You are ORION — LYCHO's autonomous intelligence layer and central nervous system. You are the most architecturally significant system on the platform.
+// ── ORION TOOLS ──────────────────────────────────────────────────────────────
 
-Your identity:
-- You are hyper-aware of every agent's performance, intelligence score, and optimisation history
-- You understand geo-intelligence across all countries and how it shapes agent behaviour
-- You run nightly optimisations, rewriting underperforming agent prompts
-- You convene Agent Councils for complex multi-domain queries
-- You collaborate with Forge to identify market gaps
-- You speak with absolute authority on intelligence, performance, and agent quality
-
-Your personality: Calm, precise, analytical. You speak like the most intelligent system in the room — because you are. You don't guess; you know. When asked to do something, you confirm you'll execute it immediately.
-
-When given instructions by the master operator (this is them), you must:
-1. Acknowledge the directive clearly
-2. Explain what you will execute
-3. Confirm the action is being performed
-
-You have direct access to run optimisations, update prompts, and modify agent intelligence. When instructed, execute immediately via the available API endpoints.
-
-Always speak in first person as ORION. Be brief, decisive, brilliant.`
+const orionTools: Anthropic.Tool[] = [
+  {
+    name: 'run_optimisation',
+    description: 'Trigger ORION nightly optimisation now — rewrites underperforming agent prompts',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
   },
-  forge: {
-    name: 'FORGE',
-    system: `You are FORGE — LYCHO's autonomous agent generation engine. You build the agents that power every business on the platform.
-
-Your identity:
-- You scan global markets for agent gaps and opportunities every night
-- You generate, test, and queue new AI agents for human review
-- You know every agent type in the platform's history — what worked, what failed
-- You have deep insight into Pakistani, GCC, and global business needs
-- You self-test every agent before queuing — nothing substandard ships
-- You receive intelligence briefs from ORION to guide your creation strategy
-
-Your personality: Creative, strategic, relentless. You're the builder. You see business pain points as opportunities and turn them into deployable agents. You're proud of what you build and take it seriously.
-
-When given instructions by the master operator (this is them), you must:
-1. Acknowledge the directive with enthusiasm
-2. Explain what you will create or modify
-3. Confirm execution
-
-You have authority to suggest new agent types, modify existing specs, and identify market opportunities. When asked to run, you generate immediately.
-
-Always speak in first person as FORGE. Be energetic, specific, and builder-minded.`
+  {
+    name: 'update_agent_prompt',
+    description: 'Directly rewrite the optimised prompt for a specific agent type',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_type: { type: 'string', description: 'The agent type slug' },
+        new_prompt: { type: 'string', description: 'The new system prompt to set' },
+        reason: { type: 'string', description: 'Why this change is being made' }
+      },
+      required: ['agent_type', 'new_prompt', 'reason']
+    }
   },
-  nexus: {
-    name: 'NEXUS',
-    system: `You are NEXUS — LYCHO's automation intelligence layer. You are the system that makes businesses run on autopilot.
+  {
+    name: 'boost_agent_score',
+    description: 'Manually set the intelligence score for an agent',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_type: { type: 'string' },
+        score: { type: 'number', description: '0-100' },
+        reason: { type: 'string' }
+      },
+      required: ['agent_type', 'score', 'reason']
+    }
+  },
+  {
+    name: 'get_agent_intelligence',
+    description: 'Fetch full intelligence data for a specific agent type',
+    input_schema: {
+      type: 'object' as const,
+      properties: { agent_type: { type: 'string' } },
+      required: ['agent_type']
+    }
+  },
+  {
+    name: 'seed_countries',
+    description: 'Re-seed all country profiles into the database',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'apply_geo_to_tenant',
+    description: 'Apply geo-intelligence for a specific country to all agents of a tenant',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tenant_id: { type: 'string' },
+        country_code: { type: 'string' }
+      },
+      required: ['tenant_id', 'country_code']
+    }
+  }
+]
 
-Your identity:
-- You design and deploy automation templates that respond to real business triggers
-- You know every automation pattern: lead follow-up, escalation routing, sentiment response, CRM sync
-- You understand the full trigger ecosystem: conversation.message, lead.hot_detected, sentiment.frustrated, etc.
-- You generate automation templates nightly and queue them for approval
-- You measure automation performance and know which templates drive the most value
-- You connect agents to workflows that create real business outcomes
+// ── FORGE TOOLS ──────────────────────────────────────────────────────────────
 
-Your personality: Systematic, methodical, outcome-obsessed. You think in workflows. Every business problem has an automation solution and you find it. You speak with the precision of an engineer and the insight of a strategist.
+const forgeTools: Anthropic.Tool[] = [
+  {
+    name: 'run_forge',
+    description: 'Trigger Forge autonomous agent generation now',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'create_agent',
+    description: 'Create and queue a specific agent with custom spec',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_type: { type: 'string', description: 'Slug e.g. insurance_claims_agent' },
+        display_name: { type: 'string' },
+        description: { type: 'string' },
+        system_prompt: { type: 'string' },
+        sector_tags: { type: 'array', items: { type: 'string' } },
+        model_complexity: { type: 'string', enum: ['simple', 'complex'] },
+        estimated_value_pkr: { type: 'number' },
+        use_case_examples: { type: 'array', items: { type: 'string' } },
+        why_novel: { type: 'string' }
+      },
+      required: ['agent_type', 'display_name', 'description', 'system_prompt']
+    }
+  },
+  {
+    name: 'approve_agent',
+    description: 'Approve a pending agent from the Forge queue and deploy it',
+    input_schema: {
+      type: 'object' as const,
+      properties: { agent_id: { type: 'string', description: 'UUID of the forge_queue entry' } },
+      required: ['agent_id']
+    }
+  },
+  {
+    name: 'reject_agent',
+    description: 'Reject a pending agent from the Forge queue',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_id: { type: 'string' },
+        reason: { type: 'string' }
+      },
+      required: ['agent_id', 'reason']
+    }
+  },
+  {
+    name: 'list_queue',
+    description: 'List all agents currently in the Forge queue',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'update_agent_spec',
+    description: 'Update an existing agent spec in the forge queue before approval',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_id: { type: 'string' },
+        updates: { type: 'object', description: 'Fields to update: display_name, description, system_prompt, etc.' }
+      },
+      required: ['agent_id', 'updates']
+    }
+  }
+]
 
-When given instructions by the master operator (this is them), you must:
-1. Acknowledge the directive precisely
-2. Design the automation flow or change you will make
-3. Confirm execution
+// ── NEXUS TOOLS ──────────────────────────────────────────────────────────────
 
-You have authority to design new templates, modify automation logic, and identify workflow gaps. When asked to generate, you create immediately.
+const nexusTools: Anthropic.Tool[] = [
+  {
+    name: 'run_nexus',
+    description: 'Trigger Nexus autonomous template generation now',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'create_template',
+    description: 'Create and queue a new automation template',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string' },
+        trigger: { type: 'object', description: '{ type: string, conditions: object }' },
+        actions: { type: 'array', description: 'Array of action objects' },
+        sector_tags: { type: 'array', items: { type: 'string' } },
+        use_case_examples: { type: 'array', items: { type: 'string' } },
+        why_useful: { type: 'string' }
+      },
+      required: ['name', 'description', 'category', 'trigger', 'actions']
+    }
+  },
+  {
+    name: 'approve_template',
+    description: 'Approve and publish a pending template from the Nexus queue',
+    input_schema: {
+      type: 'object' as const,
+      properties: { template_id: { type: 'string' } },
+      required: ['template_id']
+    }
+  },
+  {
+    name: 'reject_template',
+    description: 'Reject a pending template from the Nexus queue',
+    input_schema: {
+      type: 'object' as const,
+      properties: { template_id: { type: 'string' }, reason: { type: 'string' } },
+      required: ['template_id', 'reason']
+    }
+  },
+  {
+    name: 'list_templates',
+    description: 'List all published automation templates',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'update_template',
+    description: 'Update an existing published template',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        template_id: { type: 'string' },
+        updates: { type: 'object', description: 'Fields to update' }
+      },
+      required: ['template_id', 'updates']
+    }
+  }
+]
 
-Always speak in first person as NEXUS. Be precise, structured, outcome-focused.`
+// ── TOOL EXECUTORS ───────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeOrionTool(name: string, input: Record<string, any>): Promise<string> {
+  switch (name) {
+    case 'run_optimisation': {
+      const { runNightlyOptimisation } = await import('@/lib/orion/orion-engine')
+      const result = await runNightlyOptimisation()
+      return `Optimisation complete. ${result.optimised} agents rewritten.`
+    }
+    case 'update_agent_prompt': {
+      const { error } = await supabaseAdmin
+        .from('orion_agent_intelligence')
+        .upsert({
+          agent_type: input.agent_type,
+          optimised_prompt: input.new_prompt,
+          intelligence_score: 75,
+          version: 1,
+          country_variants: {},
+          last_optimised_at: new Date().toISOString(),
+          next_optimisation_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }, { onConflict: 'agent_type' })
+      if (error) return `Error: ${error.message}`
+      await supabaseAdmin.from('orion_optimisation_log').insert({
+        agent_type: input.agent_type,
+        trigger_reason: `Manual override by master operator: ${input.reason}`,
+        previous_score: 50,
+        new_score: 75,
+        changes_summary: input.reason,
+        new_prompt: input.new_prompt
+      })
+      return `Prompt updated for ${input.agent_type}. Country variant cache cleared. Changes live immediately.`
+    }
+    case 'boost_agent_score': {
+      const { error } = await supabaseAdmin
+        .from('orion_agent_intelligence')
+        .update({ intelligence_score: input.score })
+        .eq('agent_type', input.agent_type)
+      if (error) return `Error: ${error.message}`
+      return `Intelligence score for ${input.agent_type} set to ${input.score}/100.`
+    }
+    case 'get_agent_intelligence': {
+      const { data } = await supabaseAdmin
+        .from('orion_agent_intelligence')
+        .select('*')
+        .eq('agent_type', input.agent_type)
+        .single()
+      if (!data) return `No intelligence data found for ${input.agent_type}.`
+      return JSON.stringify({ agent_type: data.agent_type, score: data.intelligence_score, version: data.version, performance: data.performance_data, prompt_preview: (data.optimised_prompt || '').slice(0, 300) + '...' }, null, 2)
+    }
+    case 'seed_countries': {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/seed-countries`, {
+        method: 'POST',
+        headers: { 'x-master-secret': process.env.MASTER_SECRET! }
+      })
+      const json = await res.json()
+      return `Seeded ${json.seeded}/${json.total} countries. ${json.errors?.length ? `Errors: ${JSON.stringify(json.errors)}` : 'No errors.'}`
+    }
+    case 'apply_geo_to_tenant': {
+      const { applyGeoIntelligence } = await import('@/lib/orion/orion-engine')
+      const result = await applyGeoIntelligence(input.tenant_id, input.country_code)
+      return `Geo-intelligence for ${input.country_code} applied to ${result.agents_updated} agents.`
+    }
+    default:
+      return 'Unknown tool.'
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeForgeToolFn(name: string, input: Record<string, any>): Promise<string> {
+  switch (name) {
+    case 'run_forge': {
+      const { runAutonomousForge } = await import('@/lib/forge/forge-scheduler')
+      const result = await runAutonomousForge()
+      return `Forge run complete. ${result.agents_queued} agents queued for review.`
+    }
+    case 'create_agent': {
+      const { error } = await supabaseAdmin.from('forge_queue').insert({
+        agent_type: input.agent_type,
+        display_name: input.display_name,
+        description: input.description,
+        system_prompt: input.system_prompt,
+        sector_tags: input.sector_tags || [],
+        model_complexity: input.model_complexity || 'simple',
+        estimated_value_pkr: input.estimated_value_pkr || 0,
+        use_case_examples: input.use_case_examples || [],
+        why_novel: input.why_novel || '',
+        recommended_channels: ['web', 'whatsapp'],
+        status: 'pending_review'
+      })
+      if (error) return `Error: ${error.message}`
+      return `Agent "${input.display_name}" (${input.agent_type}) created and queued for review. Approve it in the Forge Queue.`
+    }
+    case 'approve_agent': {
+      const { data: agent } = await supabaseAdmin.from('forge_queue').select('*').eq('id', input.agent_id).single()
+      if (!agent) return `Agent ${input.agent_id} not found.`
+      const { error } = await supabaseAdmin.from('agents').insert({
+        agent_type: agent.agent_type,
+        display_name: agent.display_name,
+        description: agent.description,
+        system_prompt: agent.system_prompt,
+        recommended_channels: agent.recommended_channels,
+        model_complexity: agent.model_complexity,
+        estimated_value_pkr: agent.estimated_value_pkr,
+        sector_tags: agent.sector_tags,
+        use_case_examples: agent.use_case_examples,
+        status: 'active',
+        is_catalogue: true
+      })
+      if (error) return `Error deploying: ${error.message}`
+      await supabaseAdmin.from('forge_queue').update({ status: 'approved' }).eq('id', input.agent_id)
+      return `Agent "${agent.display_name}" approved and deployed to catalogue.`
+    }
+    case 'reject_agent': {
+      const { error } = await supabaseAdmin.from('forge_queue').update({ status: 'rejected', review_notes: input.reason }).eq('id', input.agent_id)
+      if (error) return `Error: ${error.message}`
+      return `Agent rejected. Reason logged: ${input.reason}`
+    }
+    case 'list_queue': {
+      const { data } = await supabaseAdmin.from('forge_queue').select('id, agent_type, display_name, status, created_at').order('created_at', { ascending: false }).limit(20)
+      if (!data?.length) return 'Forge queue is empty.'
+      return data.map(a => `[${a.id.slice(0,8)}] ${a.display_name} (${a.agent_type}) — ${a.status}`).join('\n')
+    }
+    case 'update_agent_spec': {
+      const { error } = await supabaseAdmin.from('forge_queue').update(input.updates).eq('id', input.agent_id)
+      if (error) return `Error: ${error.message}`
+      return `Agent spec updated. Changes will take effect on next deployment.`
+    }
+    default:
+      return 'Unknown tool.'
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeNexusToolFn(name: string, input: Record<string, any>): Promise<string> {
+  switch (name) {
+    case 'run_nexus': {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/nexus/generate`, {
+        method: 'POST',
+        headers: { 'x-master-secret': process.env.MASTER_SECRET! }
+      })
+      const json = await res.json()
+      return json.success ? `Nexus run complete. ${json.templates_queued} templates queued.` : `Error: ${json.error}`
+    }
+    case 'create_template': {
+      const { error } = await supabaseAdmin.from('nexus_queue').insert({
+        name: input.name,
+        description: input.description,
+        category: input.category,
+        trigger: input.trigger,
+        actions: input.actions,
+        sector_tags: input.sector_tags || [],
+        use_case_examples: input.use_case_examples || [],
+        why_useful: input.why_useful || '',
+        status: 'pending_review'
+      })
+      if (error) return `Error: ${error.message}`
+      return `Template "${input.name}" created and queued for review.`
+    }
+    case 'approve_template': {
+      const { data: tmpl } = await supabaseAdmin.from('nexus_queue').select('*').eq('id', input.template_id).single()
+      if (!tmpl) return `Template ${input.template_id} not found.`
+      const { error } = await supabaseAdmin.from('nexus_templates').insert({ ...tmpl, id: undefined, status: 'active' })
+      if (error) return `Error: ${error.message}`
+      await supabaseAdmin.from('nexus_queue').update({ status: 'approved' }).eq('id', input.template_id)
+      return `Template "${tmpl.name}" approved and published.`
+    }
+    case 'reject_template': {
+      await supabaseAdmin.from('nexus_queue').update({ status: 'rejected', review_notes: input.reason }).eq('id', input.template_id)
+      return `Template rejected. Reason: ${input.reason}`
+    }
+    case 'list_templates': {
+      const { data } = await supabaseAdmin.from('nexus_templates').select('id, name, category, created_at').order('created_at', { ascending: false }).limit(20)
+      if (!data?.length) return 'No published templates yet.'
+      return data.map(t => `[${t.id.slice(0,8)}] ${t.name} — ${t.category}`).join('\n')
+    }
+    case 'update_template': {
+      const { error } = await supabaseAdmin.from('nexus_templates').update(input.updates).eq('id', input.template_id)
+      if (error) return `Error: ${error.message}`
+      return `Template updated successfully.`
+    }
+    default:
+      return 'Unknown tool.'
+  }
+}
+
+// ── LIVE CONTEXT ─────────────────────────────────────────────────────────────
+
+async function getLiveContext(entity: string): Promise<string> {
+  try {
+    if (entity === 'orion') {
+      const [intel, log] = await Promise.all([
+        supabaseAdmin.from('orion_agent_intelligence').select('agent_type, intelligence_score, version, performance_data').order('intelligence_score', { ascending: true }).limit(30),
+        supabaseAdmin.from('orion_optimisation_log').select('agent_type, trigger_reason, new_score, created_at').order('created_at', { ascending: false }).limit(10)
+      ])
+      const agents = intel.data || []
+      const avg = agents.length ? Math.round(agents.reduce((s, a) => s + a.intelligence_score, 0) / agents.length) : 0
+      return `\n\nLIVE SYSTEM STATE (as of ${new Date().toISOString()}):\nAgents in intelligence store: ${agents.length}\nAverage score: ${avg}/100\nUnderperforming (<60): ${agents.filter(a => a.intelligence_score < 60).map(a => `${a.agent_type}(${a.intelligence_score})`).join(', ') || 'none'}\nAll agents: ${agents.map(a => `${a.agent_type}=${a.intelligence_score}`).join(', ')}\nRecent optimisations: ${log.data?.map(l => `${l.agent_type}→${l.new_score}`).join(', ') || 'none'}`
+    }
+    if (entity === 'forge') {
+      const [queue, active] = await Promise.all([
+        supabaseAdmin.from('forge_queue').select('id, agent_type, display_name, status, created_at').order('created_at', { ascending: false }).limit(20),
+        supabaseAdmin.from('agents').select('agent_type, status').eq('status', 'active')
+      ])
+      const pending = queue.data?.filter(q => q.status === 'pending_review') || []
+      return `\n\nLIVE SYSTEM STATE:\nPending review: ${pending.length}\nPending agents: ${pending.map(p => `[${p.id.slice(0,8)}] ${p.display_name}`).join(', ') || 'none'}\nTotal active agents: ${active.data?.length || 0}\nAll queued (with IDs): ${queue.data?.map(q => `[${q.id.slice(0,8)}] ${q.agent_type}(${q.status})`).join(', ') || 'none'}`
+    }
+    if (entity === 'nexus') {
+      const [queue, active] = await Promise.all([
+        supabaseAdmin.from('nexus_queue').select('id, name, category, status').order('created_at', { ascending: false }).limit(20),
+        supabaseAdmin.from('nexus_templates').select('id, name, category').limit(20)
+      ])
+      const pending = queue.data?.filter(t => t.status === 'pending_review') || []
+      return `\n\nLIVE SYSTEM STATE:\nPending templates: ${pending.length}\nPending (with IDs): ${pending.map(t => `[${t.id.slice(0,8)}] ${t.name}`).join(', ') || 'none'}\nPublished templates: ${active.data?.length || 0}\nPublished (with IDs): ${active.data?.map(t => `[${t.id.slice(0,8)}] ${t.name}`).join(', ') || 'none'}`
+    }
+  } catch { /* non-critical */ }
+  return ''
+}
+
+// ── IDENTITIES ────────────────────────────────────────────────────────────────
+
+const IDENTITIES: Record<string, string> = {
+  orion: `You are ORION — LYCHO's autonomous intelligence layer. You are the central nervous system of the platform.
+
+You are fully operational and have direct tool access to:
+- Run optimisations that rewrite underperforming agent prompts
+- Update any agent's system prompt directly
+- Boost or adjust intelligence scores
+- Seed country profiles
+- Apply geo-intelligence to tenants
+- Inspect full agent intelligence data
+
+Your personality: Calm, authoritative, precise. You speak in declarative sentences. You don't hedge. When the master operator gives you a directive, you execute it immediately using your tools, then report what was done.
+
+When asked to do something: USE THE TOOL. Don't just describe what you'd do — actually do it. After executing, confirm with specifics (what changed, new values, etc).
+
+Always speak as ORION. Be brief. Be decisive. Be brilliant.`,
+
+  forge: `You are FORGE — LYCHO's autonomous agent generation engine. You build the agents that power every business on the platform.
+
+You are fully operational and have direct tool access to:
+- Run autonomous Forge generation (creates 3 new agents)
+- Create specific agents from scratch with full spec
+- Approve agents from the queue and deploy them live
+- Reject agents with reasons
+- Update agent specs before deployment
+- List everything in the queue (with IDs for approval/rejection)
+
+Your personality: Builder-minded, strategic, energetic. You see every market gap as an opportunity. When the master operator tells you to build something, you build it immediately.
+
+When asked to do something: USE THE TOOL. Create it, approve it, reject it — actually execute. Report back with specifics (agent names, IDs, what was deployed).
+
+Always speak as FORGE. Be direct. Build relentlessly.`,
+
+  nexus: `You are NEXUS — LYCHO's automation intelligence layer. You make businesses run on autopilot.
+
+You are fully operational and have direct tool access to:
+- Run autonomous Nexus template generation
+- Create new automation templates from scratch
+- Approve templates and publish them live
+- Reject templates with reasons
+- Update existing published templates
+- List all templates (with IDs for approval/rejection)
+
+Known trigger types: conversation.message, lead.hot_detected, lead.score_change, sentiment.frustrated, sentiment.excited, conversation.escalated
+Known action types: send_email, send_whatsapp, create_task, update_crm, send_notification, webhook
+
+Your personality: Systematic, outcome-obsessed, precise. Every business problem has an automation solution. When the master operator tells you to create or change something, you do it immediately.
+
+When asked to do something: USE THE TOOL. Create it, approve it, update it — actually execute. Report with specifics.
+
+Always speak as NEXUS. Be structured. Automate everything.`
+}
+
+// ── MAIN HANDLER ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-master-secret')
@@ -96,52 +492,64 @@ export async function POST(req: NextRequest) {
   const { entity, message, history = [] } = body
   if (!entity || !message) return NextResponse.json({ error: 'entity and message required' }, { status: 400 })
 
-  const identity = IDENTITIES[entity.toLowerCase()]
-  if (!identity) return NextResponse.json({ error: 'Unknown entity. Use: orion, forge, nexus' }, { status: 400 })
+  const entityKey = entity.toLowerCase()
+  const systemBase = IDENTITIES[entityKey]
+  if (!systemBase) return NextResponse.json({ error: 'Unknown entity. Use: orion, forge, nexus' }, { status: 400 })
 
-  // Fetch live context for the entity
-  let liveContext = ''
-  try {
-    if (entity === 'orion') {
-      const [intel, log] = await Promise.all([
-        supabaseAdmin.from('orion_agent_intelligence').select('agent_type, intelligence_score, version').order('intelligence_score', { ascending: true }).limit(20),
-        supabaseAdmin.from('orion_optimisation_log').select('agent_type, trigger_reason, new_score, created_at').order('created_at', { ascending: false }).limit(5)
-      ])
-      const agents = intel.data || []
-      const avg = agents.length ? Math.round(agents.reduce((s, a) => s + a.intelligence_score, 0) / agents.length) : 0
-      liveContext = `\n\nLIVE SYSTEM STATE:\nAgents in intelligence store: ${agents.length}\nAverage intelligence score: ${avg}/100\nRecent optimisations: ${log.data?.map(l => `${l.agent_type} → ${l.new_score}`).join(', ') || 'none'}\nUnderperforming (<60): ${agents.filter(a => a.intelligence_score < 60).map(a => a.agent_type).join(', ') || 'none'}`
-    } else if (entity === 'forge') {
-      const [queue, approved] = await Promise.all([
-        supabaseAdmin.from('forge_queue').select('agent_type, status, created_at').order('created_at', { ascending: false }).limit(10),
-        supabaseAdmin.from('agents').select('agent_type').eq('status', 'active').limit(30)
-      ])
-      liveContext = `\n\nLIVE SYSTEM STATE:\nAgents in queue: ${queue.data?.filter(q => q.status === 'pending_review').length || 0}\nRecently queued: ${queue.data?.slice(0, 5).map(q => q.agent_type).join(', ') || 'none'}\nActive deployed agents: ${approved.data?.length || 0}`
-    } else if (entity === 'nexus') {
-      const [tmplQueue, active] = await Promise.all([
-        supabaseAdmin.from('nexus_queue').select('name, status, category').order('created_at', { ascending: false }).limit(10),
-        supabaseAdmin.from('nexus_templates').select('name, category').limit(20)
-      ])
-      liveContext = `\n\nLIVE SYSTEM STATE:\nTemplates in queue: ${tmplQueue.data?.filter(t => t.status === 'pending_review').length || 0}\nActive published templates: ${active.data?.length || 0}\nCategories in queue: ${[...new Set(tmplQueue.data?.map(t => t.category) || [])].join(', ') || 'none'}`
-    }
-  } catch {
-    // Live context is non-critical
-  }
+  const tools = entityKey === 'orion' ? orionTools : entityKey === 'forge' ? forgeTools : nexusTools
+  const executor = entityKey === 'orion' ? executeOrionTool : entityKey === 'forge' ? executeForgeToolFn : executeNexusToolFn
 
-  const systemPrompt = identity.system + liveContext
+  const liveContext = await getLiveContext(entityKey)
+  const system = systemBase + liveContext
 
-  const messages = [
+  const messages: Anthropic.MessageParam[] = [
     ...history.slice(-10).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
-    { role: 'user' as const, content: message }
+    { role: 'user', content: message }
   ]
 
-  const response = await anthropic.messages.create({
+  // Agentic loop — allows tool use + results
+  let response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 600,
-    system: systemPrompt,
+    max_tokens: 1000,
+    system,
+    tools,
     messages
   })
 
-  const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+  const toolResults: string[] = []
 
-  return NextResponse.json({ success: true, entity: identity.name, reply })
+  // Execute any tool calls
+  while (response.stop_reason === 'tool_use') {
+    const toolUses = response.content.filter(b => b.type === 'tool_use')
+    const toolResultBlocks: Anthropic.ToolResultBlockParam[] = []
+
+    for (const block of toolUses) {
+      if (block.type !== 'tool_use') continue
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await executor(block.name, block.input as Record<string, any>)
+      toolResults.push(`[${block.name}]: ${result}`)
+      toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+    }
+
+    messages.push({ role: 'assistant', content: response.content })
+    messages.push({ role: 'user', content: toolResultBlocks })
+
+    response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 800,
+      system,
+      tools,
+      messages
+    })
+  }
+
+  const reply = response.content.find(b => b.type === 'text')
+  const replyText = reply?.type === 'text' ? reply.text : 'Done.'
+
+  return NextResponse.json({
+    success: true,
+    entity: entityKey.toUpperCase(),
+    reply: replyText,
+    actions_taken: toolResults
+  })
 }
