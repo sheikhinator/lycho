@@ -8,11 +8,11 @@ import { Send, ArrowRight, Check } from 'lucide-react'
 interface Msg { role: 'user' | 'assistant'; content: string }
 
 const FEATURES = [
-  'Handles WhatsApp, Email & Web 24/7',
-  'Lead scoring & hot lead alerts',
-  'Multilingual — Urdu, English, Arabic',
-  'Escalates complex queries to humans',
-  'Learns from every conversation',
+  '370+ specialist agents across 20 sectors',
+  'Every business function covered',
+  'Every language — auto-detected',
+  'Gets smarter with every conversation',
+  'Deploy in minutes — no technical setup',
 ]
 
 export default function DemoPage() {
@@ -83,10 +83,10 @@ export default function DemoPage() {
         <div style={{ padding: '48px 40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRight: '1px solid #1e1e1e' }}>
           <p style={{ color: '#C9A84C', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '12px' }}>Live Demo</p>
           <h1 style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(2rem, 4vw, 3rem)', letterSpacing: '0.05em', lineHeight: 1.05, marginBottom: '16px' }}>
-            SEE LYCHO<br />IN ACTION
+            SEE YOUR AI WORKFORCE<br />IN ACTION
           </h1>
           <p style={{ color: '#6b6b6b', fontSize: '14px', lineHeight: 1.7, marginBottom: '32px', maxWidth: '380px' }}>
-            Chat with a live LYCHO AI agent — the same technology that handles thousands of customer conversations for businesses every day.
+            Tell us what your business does. We&apos;ll show you exactly which specialist agents would transform your operations.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '40px' }}>
@@ -117,7 +117,7 @@ export default function DemoPage() {
               <span style={{ color: '#C9A84C', fontWeight: 700 }}>L</span>
             </div>
             <div>
-              <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>LYCHO Demo Agent</p>
+              <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>LYCHO Specialist Advisor</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
                 <p style={{ color: '#6b6b6b', fontSize: '11px', margin: 0 }}>
@@ -131,7 +131,7 @@ export default function DemoPage() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '400px', maxHeight: '60vh' }}>
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', paddingTop: '40px' }}>
-                <p style={{ color: '#6b6b6b', fontSize: '13px' }}>Ask anything — try &quot;What can you do?&quot; or &quot;How does LYCHO work?&quot;</p>
+                <p style={{ color: '#6b6b6b', fontSize: '13px' }}>What industry is your business in? I&apos;ll show you exactly which specialist agents would transform your operations.</p>
               </div>
             )}
             {messages.map((msg, i) => {

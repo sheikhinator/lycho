@@ -4,11 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Logo } from '@/components/ui/Logo'
-import { AGENT_CATALOGUE } from '@/lib/agents-catalogue'
-import {
-  Check, ArrowRight, Copy, MessageCircle, Menu, X,
-  MessageSquare, Search, Settings, Users, BarChart2, Shield, FileText,
-} from 'lucide-react'
+import { Check, ArrowRight, Copy, MessageCircle, Menu, X } from 'lucide-react'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.vercel.app'
 
@@ -20,16 +16,6 @@ function RefCapture() {
     if (ref) localStorage.setItem('lycho_ref_code', ref.toUpperCase())
   }, [searchParams])
   return null
-}
-
-// ─── Icon map ─────────────────────────────────────────────────────────────────
-const ICON_MAP: Record<string, React.ElementType> = {
-  MessageSquare, Search, Settings, Users, BarChart2, Shield, FileText,
-}
-
-function AgentIcon({ name }: { name: string }) {
-  const Icon = ICON_MAP[name]
-  return Icon ? <Icon size={20} /> : <MessageSquare size={20} />
 }
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
@@ -256,11 +242,32 @@ function WaitlistSection() {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+const SECTORS = [
+  { name: 'Sales & Marketing',    agents: 25, examples: ['Lead Qualifier', 'Sales Closer', 'Cold Outreach'] },
+  { name: 'Customer Service',     agents: 25, examples: ['Complaint Handler', 'Returns & Refunds', 'Live Chat'] },
+  { name: 'Healthcare',           agents: 25, examples: ['Patient Intake', 'Medical Follow-up', 'Appointment Scheduler'] },
+  { name: 'Legal',                agents: 20, examples: ['Legal Intake', 'Contract Review', 'Compliance Checker'] },
+  { name: 'Finance & Accounting', agents: 25, examples: ['Invoice Agent', 'Tax Assistant', 'Payroll Agent'] },
+  { name: 'Real Estate',          agents: 20, examples: ['Property Enquiry', 'Tenant Support', 'Rental Manager'] },
+  { name: 'Education',            agents: 20, examples: ['Student Admissions', 'Tutor Assistant', 'Career Counsellor'] },
+  { name: 'Hospitality',          agents: 20, examples: ['Restaurant Booking', 'Hotel Concierge', 'Event Coordinator'] },
+  { name: 'Ecommerce & Retail',   agents: 25, examples: ['Order Tracking', 'Product Advisor', 'Cart Recovery'] },
+  { name: 'Logistics',            agents: 20, examples: ['Shipment Coordinator', 'Customs Agent', 'Freight Broker'] },
+  { name: 'HR & Recruitment',     agents: 20, examples: ['Recruitment Screener', 'Employee Onboarding', 'HR Helpdesk'] },
+  { name: 'Construction',         agents: 15, examples: ['Project Enquiry', 'Planning Permission', 'Site Safety'] },
+  { name: 'Automotive',           agents: 15, examples: ['Vehicle Service', 'Car Sales', 'Auto Finance'] },
+  { name: 'Insurance',            agents: 15, examples: ['Claims Handler', 'Policy Advisor', 'Renewal Agent'] },
+  { name: 'Technology',           agents: 20, examples: ['IT Helpdesk', 'Software Support', 'Cybersecurity Agent'] },
+  { name: 'Government',           agents: 15, examples: ['Citizen Services', 'Tax Filing', 'Permit Agent'] },
+  { name: 'Agriculture',          agents: 10, examples: ['Crop Advisory', 'Livestock Agent', 'Market Prices'] },
+  { name: 'Media & Entertainment',agents: 10, examples: ['Content Creator', 'PR Agent', 'Advertising Agent'] },
+  { name: 'Non-Profit',           agents: 10, examples: ['Donor Relations', 'Volunteer Coordinator', 'Grant Writing'] },
+  { name: 'Professional Services',agents: 15, examples: ['Consulting Intake', 'Strategy Agent', 'Management Consulting'] },
+]
+
 export default function Home() {
   const [annual, setAnnual] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
-
-  const coreAgents = AGENT_CATALOGUE.core.slice(0, 6)
 
   const PLANS = [
     { id: 'starter',    name: 'Starter',    priceM: 9900,   priceA: 7920,  highlight: false },
@@ -322,7 +329,7 @@ export default function Home() {
               className="font-sans mb-10 mx-auto"
               style={{ color: '#6b6b6b', fontSize: 'clamp(0.95rem, 2vw, 1.1rem)', maxWidth: '580px', lineHeight: 1.7 }}
             >
-              LYCHO deploys an AI workforce that handles every customer interaction — on WhatsApp, email, web, and 44 other surfaces — while you focus on growing.
+              LYCHO deploys a complete AI workforce across every department of your business. 370+ specialist agents. 20 sectors. Running 24/7.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -358,10 +365,10 @@ export default function Home() {
         <div style={{ borderTop: '2px solid rgba(201,168,76,0.3)', borderBottom: '1px solid #2a2a2a', background: '#0d0d0d' }}>
           <div className="max-w-6xl mx-auto px-5 py-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { num: '70+',     label: 'AI Agents Ready to Deploy' },
-              { num: '47',      label: 'Surfaces. WhatsApp to Voice.' },
-              { num: '24/7',    label: 'Always On. Never Tired.' },
-              { num: '7 Days', label: 'Trial from PKR 999.' },
+              { num: '370+',    label: 'Specialist Agents' },
+              { num: '20',      label: 'Business Sectors' },
+              { num: '47',      label: 'Surfaces' },
+              { num: '24/7',    label: 'Always On' },
             ].map(s => (
               <div key={s.num} className="text-center">
                 <p className="font-bebas" style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', color: '#C9A84C', letterSpacing: '0.04em', lineHeight: 1 }}>{s.num}</p>
@@ -377,17 +384,14 @@ export default function Home() {
             <div className="text-center mb-14">
               <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#ef4444', opacity: 0.8 }}>The Problem</p>
               <h2 className="font-bebas mb-4" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: '#F0EBE1', letterSpacing: '0.05em' }}>
-                YOUR BUSINESS IS LOSING CUSTOMERS<br />RIGHT NOW
+                THREE PROBLEMS<br />KILLING YOUR BUSINESS
               </h2>
-              <p className="text-sm font-sans mx-auto" style={{ color: '#6b6b6b', maxWidth: '500px' }}>
-                Every unanswered message is a lost sale. Every repetitive task is wasted human potential.
-              </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { title: 'Missed at 2AM', body: 'Customers message outside office hours. They don\'t wait. They move on.' },
-                { title: 'Buried in Repetition', body: 'Your team answers the same questions 40 times a day. That\'s 40 opportunities to do something that matters.' },
-                { title: 'No Intelligence', body: 'You have no idea what customers actually need until it\'s too late. Every missed conversation is a missed insight.' },
+                { title: 'No Intelligence Layer', body: 'No one monitoring your market, tracking competitors, managing compliance, or running your operations while you sleep.' },
+                { title: 'Departments In Isolation', body: 'Sales doesn\'t talk to compliance. Operations doesn\'t talk to analytics. Your business leaks money through the gaps.' },
+                { title: 'Paying For Manual Work', body: 'Invoicing, scheduling, reporting, follow-ups, content creation — all of it should run itself.' },
               ].map(card => (
                 <div key={card.title} className="rounded-xl p-6" style={{ background: '#141414', borderLeft: '2px solid rgba(239,68,68,0.5)', border: '1px solid #1e1e1e', borderLeftWidth: '2px', borderLeftColor: 'rgba(239,68,68,0.5)' }}>
                   <h3 className="font-bebas text-xl mb-3" style={{ color: '#F0EBE1', letterSpacing: '0.05em' }}>{card.title}</h3>
@@ -404,14 +408,14 @@ export default function Home() {
             <div className="text-center mb-14">
               <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#7a6130' }}>The Solution</p>
               <h2 className="font-bebas mb-4" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: '#F0EBE1', letterSpacing: '0.05em' }}>
-                LYCHO RUNS YOUR BUSINESS<br />WHILE YOU SLEEP
+                LYCHO RUNS YOUR ENTIRE BUSINESS
               </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { title: 'Always On', body: 'Every message answered in seconds. In Urdu, English, Arabic, or any language your customer speaks. 24 hours. 7 days.' },
-                { title: 'Always Learning', body: 'Every conversation makes your agents smarter. Every interaction builds your customer intelligence. The longer it runs, the better it gets.' },
-                { title: 'Always Everywhere', body: 'WhatsApp, email, web, SMS, Instagram, Facebook. One intelligence. 47 surfaces. One unified customer picture.' },
+                { title: '370+ Specialist Agents', body: 'A specialist for every business function. Sales. Legal. Finance. HR. Healthcare. Logistics. Each one expert in their domain. Deploy exactly what your business needs.' },
+                { title: 'Every Sector. Every Function.', body: 'Sales & Marketing. Legal. Finance. Healthcare. Real Estate. HR. Logistics. Ecommerce. Construction. Technology. Education. Hospitality. And more.' },
+                { title: 'Gets Smarter Every Day', body: 'Every conversation makes your agents more intelligent. Every interaction builds your business knowledge. The longer LYCHO runs, the better it performs.' },
               ].map(card => (
                 <div key={card.title} className="rounded-xl p-6" style={{ background: '#141414', borderLeft: '2px solid #C9A84C', border: '1px solid #1e1e1e', borderLeftWidth: '2px', borderLeftColor: '#C9A84C' }}>
                   <h3 className="font-bebas text-xl mb-3" style={{ color: '#C9A84C', letterSpacing: '0.05em' }}>{card.title}</h3>
@@ -424,45 +428,37 @@ export default function Home() {
 
         {/* ── AGENT UNIVERSE ───────────────────────────────────────────────── */}
         <section id="agents" className="py-24 px-5" style={{ background: '#070707' }}>
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14">
               <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#7a6130' }}>Your AI Workforce</p>
-              <h2 className="font-bebas mb-4" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: '#C9A84C', letterSpacing: '0.05em' }}>
-                YOUR AI WORKFORCE
+              <h2 className="font-bebas mb-3" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: '#C9A84C', letterSpacing: '0.05em' }}>
+                370+ SPECIALIST AGENTS ACROSS 20 SECTORS
               </h2>
               <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>
-                500+ specialist agents across 20 sectors. Deploy the ones your business needs.
+                Not a chatbot. A complete AI workforce running every department of your business.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {coreAgents.map(agent => (
-                <div
-                  key={agent.type}
-                  className="rounded-xl p-5 transition-all duration-200"
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-8">
+              {SECTORS.map(sector => (
+                <Link
+                  key={sector.name}
+                  href="/signup"
+                  className="rounded-xl p-4 flex flex-col transition-all duration-200 no-underline"
                   style={{ background: '#141414', border: '1px solid #2a2a2a' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(201,168,76,0.35)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(201,168,76,0.07)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(201,168,76,0.4)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(201,168,76,0.06)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                 >
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(201,168,76,0.1)', color: '#C9A84C' }}>
-                    <AgentIcon name={agent.icon} />
-                  </div>
-                  <p className="text-sm font-sans font-medium mb-1" style={{ color: '#F0EBE1' }}>{agent.name}</p>
-                  <p className="text-xs font-sans leading-relaxed" style={{ color: '#6b6b6b' }}>{agent.description}</p>
-                </div>
+                  <p className="text-sm font-sans font-semibold mb-1" style={{ color: '#F0EBE1' }}>{sector.name}</p>
+                  <p className="text-xs font-sans mb-2" style={{ color: '#C9A84C' }}>{sector.agents} specialist agents</p>
+                  <p className="text-xs font-sans leading-relaxed" style={{ color: '#555' }}>{sector.examples.join(' · ')}</p>
+                </Link>
               ))}
             </div>
 
-            <div className="text-center">
-              <Link
-                href="/dashboard/marketplace"
-                className="inline-flex items-center gap-2 text-sm font-sans transition-opacity hover:opacity-80"
-                style={{ color: '#C9A84C' }}
-              >
-                + 494 more agents across Healthcare, Legal, Finance, Real Estate, Education and 15 more sectors
-                <ArrowRight size={14} />
-              </Link>
-            </div>
+            <p className="text-center text-xs font-sans" style={{ color: '#555' }}>
+              New specialist agents added every week across all sectors.
+            </p>
           </div>
         </section>
 
@@ -477,10 +473,10 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { n: '01', title: 'Sign up in 2 minutes',           body: 'PKR 999 — fully refunded if cancelled. Start your 7-day trial instantly.' },
-                { n: '02', title: 'Deploy your first agent in 5 minutes', body: 'Choose from 500+ specialist agents. One click to deploy.' },
-                { n: '03', title: 'Connect WhatsApp in 5 minutes',  body: 'Just your phone number. No API registration. Just connect.' },
-                { n: '04', title: 'Your business never sleeps again', body: 'From minute 14 onwards — every customer gets an instant, intelligent response.' },
+                { n: '01', title: 'Create your account in 2 minutes', body: 'PKR 999 — fully refunded if cancelled. Start your 7-day trial instantly.' },
+                { n: '02', title: 'Browse & deploy specialist agents', body: 'Browse 370+ specialist agents and deploy the ones your business needs.' },
+                { n: '03', title: 'Connect your channels', body: 'Web, email, Telegram and more. One platform. Every surface.' },
+                { n: '04', title: 'Your AI workforce runs itself', body: 'Every department. Automatically. Intelligently. Every day.' },
               ].map(step => (
                 <div key={step.n} className="flex items-start gap-5 p-6 rounded-xl" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
                   <span className="font-bebas shrink-0" style={{ fontSize: '3rem', color: '#C9A84C', letterSpacing: '0.04em', lineHeight: 1, opacity: 0.6 }}>{step.n}</span>
