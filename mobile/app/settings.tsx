@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Alert } from 'react-native'
 import { router } from 'expo-router'
 import { signOut } from '../lib/auth'
 import { supabase } from '../lib/supabase'
@@ -13,23 +13,35 @@ const MUTED = '#6b6b6b'
 
 export default function SettingsScreen() {
   const [businessName, setBusinessName] = useState('')
+  const [editingName, setEditingName] = useState('')
+  const [editing, setEditing] = useState(false)
   const [plan, setPlan] = useState('')
+  const [tenantId, setTenantId] = useState('')
 
-  useEffect(() => {
-    loadProfile()
-  }, [])
+  useEffect(() => { loadProfile() }, [])
 
   async function loadProfile() {
     const { data: user } = await supabase.auth.getUser()
     if (!user.user) return
     const { data: u } = await supabase.from('users').select('tenant_id').eq('id', user.user.id).single()
     if (u?.tenant_id) {
-      const { data: t } = await supabase.from('tenants').select('business_name, plan_status').eq('id', u.tenant_id).single()
+      setTenantId(u.tenant_id)
+      const { data: t } = await supabase.from('tenants').select('business_name, plan_status, plan').eq('id', u.tenant_id).single()
       if (t) {
         setBusinessName(t.business_name)
-        setPlan(t.plan_status ?? 'trialing')
+        setEditingName(t.business_name)
+        setPlan(`${t.plan} (${t.plan_status})`)
       }
     }
+  }
+
+  async function saveProfile() {
+    if (!tenantId) return
+    const { error } = await supabase.from('tenants').update({ business_name: editingName }).eq('id', tenantId)
+    if (error) { Alert.alert('Error', error.message); return }
+    setBusinessName(editingName)
+    setEditing(false)
+    Alert.alert('Saved', 'Profile updated')
   }
 
   async function handleSignOut() {
@@ -45,21 +57,39 @@ export default function SettingsScreen() {
         <Text style={styles.sectionLabel}>PROFILE</Text>
         <View style={styles.item}>
           <Text style={styles.itemLabel}>Business</Text>
-          <Text style={styles.itemValue}>{businessName || '—'}</Text>
+          {editing ? (
+            <TextInput style={styles.editInput} value={editingName} onChangeText={setEditingName} placeholderTextColor={MUTED} placeholder="Business name" />
+          ) : (
+            <Text style={styles.itemValue}>{businessName || '—'}</Text>
+          )}
         </View>
         <View style={[styles.item, { borderBottomWidth: 0 }]}>
           <Text style={styles.itemLabel}>Plan</Text>
-          <Text style={[styles.itemValue, { color: plan === 'trialing' ? '#fbbf24' : '#4ade80' }]}>{plan}</Text>
+          <Text style={[styles.itemValue, { color: plan.includes('trial') ? '#fbbf24' : '#4ade80' }]}>{plan}</Text>
         </View>
+        {editing ? (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditing(false); setEditingName(businessName) }}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.editLink} onPress={() => setEditing(true)}><Text style={styles.editLinkText}>Edit Profile</Text></TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>QUICK LINKS</Text>
-        <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Coming Soon', 'Profile editing coming soon.')}>
-          <Text style={styles.itemText}>Edit Profile</Text>
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/billing' as never)}>
+          <Text style={styles.itemText}>💳 Billing</Text>
+          <Text style={styles.arrow}>→</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.item, { borderBottomWidth: 0 }]} onPress={() => Alert.alert('Coming Soon', 'Notification settings coming soon.')}>
-          <Text style={styles.itemText}>Notifications</Text>
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/analytics' as never)}>
+          <Text style={styles.itemText}>📊 Analytics</Text>
+          <Text style={styles.arrow}>→</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.item, { borderBottomWidth: 0 }]} onPress={() => router.push('/settings/notifications' as never)}>
+          <Text style={styles.itemText}>🔔 Notifications</Text>
+          <Text style={styles.arrow}>→</Text>
         </TouchableOpacity>
       </View>
 
@@ -91,4 +121,12 @@ const styles = StyleSheet.create({
   itemValue: { color: IVORY, fontSize: 14, fontWeight: '600' },
   itemText: { color: IVORY, fontSize: 14 },
   itemSub: { color: MUTED, fontSize: 12 },
+  arrow: { color: MUTED, fontSize: 16 },
+  editInput: { color: IVORY, fontSize: 14, fontWeight: '600', borderBottomWidth: 1, borderBottomColor: GOLD, flex: 1, textAlign: 'right' },
+  editLink: { marginTop: 8, alignSelf: 'flex-end' },
+  editLinkText: { color: GOLD, fontSize: 13 },
+  saveBtn: { flex: 1, backgroundColor: GOLD, borderRadius: 8, padding: 10, alignItems: 'center' },
+  saveBtnText: { color: BG, fontWeight: '700', fontSize: 13 },
+  cancelBtn: { flex: 1, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER, borderRadius: 8, padding: 10, alignItems: 'center' },
+  cancelBtnText: { color: MUTED, fontSize: 13 },
 })

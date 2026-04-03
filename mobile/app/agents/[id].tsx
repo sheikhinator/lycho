@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 const GOLD = '#C9A84C'
 const BG = '#070707'

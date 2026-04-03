@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
+import Constants from 'expo-constants'
+
+const API_URL = (Constants.expoConfig?.extra?.apiUrl as string) || 'https://lycho.vercel.app'
 
 const GOLD = '#C9A84C'
 const BG = '#070707'
@@ -19,6 +22,7 @@ export default function ConversationDetailScreen() {
   const [sending, setSending] = useState(false)
   const [contactName, setContactName] = useState('')
   const [channel, setChannel] = useState('')
+  const [agentId, setAgentId] = useState('')
 
   useEffect(() => {
     loadConversation()
@@ -28,13 +32,14 @@ export default function ConversationDetailScreen() {
     if (!id) return
     const { data } = await supabase
       .from('conversations')
-      .select('messages, contact_identifier, channel')
+      .select('messages, contact_identifier, channel, agent_id')
       .eq('id', id)
       .single()
     if (data) {
       setMessages((data.messages as Message[]) || [])
       setContactName(data.contact_identifier || 'Unknown')
       setChannel(data.channel || 'unknown')
+      setAgentId(data.agent_id || '')
     }
   }
 
@@ -46,14 +51,27 @@ export default function ConversationDetailScreen() {
     setMessages(prev => [...prev, userMsg])
 
     try {
-      const res = await fetch('/api/conversations', {
+      // Get session for auth
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+
+      const res = await fetch(`${API_URL}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: id, message: userMsg.content }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          agent_id: agentId,
+          message: userMsg.content,
+          channel: 'mobile',
+          contact_identifier: sessionData?.session?.user?.id || 'mobile-user',
+        }),
       })
       const json = await res.json()
-      if (res.ok && json.data?.response) {
-        const assistantMsg: Message = { role: 'assistant', content: json.data.response, timestamp: new Date().toISOString() }
+      const reply = json.data?.response || json.response || json.message
+      if (reply) {
+        const assistantMsg: Message = { role: 'assistant', content: reply, timestamp: new Date().toISOString() }
         setMessages(prev => [...prev, assistantMsg])
       }
     } catch {
