@@ -88,6 +88,11 @@ export async function POST(req: NextRequest) {
     change_reason: 'initial_creation',
   })
 
+  // Register in Syndicate (non-blocking)
+  import('@/lib/syndicate/syndicate').then(({ registerAgent }) =>
+    registerAgent(body.agent_type, body.display_name || body.agent_type, false)
+  ).catch(() => null)
+
   // Audit log
   await auditLog(supabase, {
     tenantId,

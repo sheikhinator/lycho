@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "LYCHO",
+    "slug": "lycho-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "lycho",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070707",
+    "splash": {
+      "backgroundColor": "#070707"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lychosystems.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#070707"
+      },
+      "package": "com.lychosystems.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
+  }
+}

@@ -7,6 +7,14 @@ type Section = typeof SECTIONS[number]
 type ChatEntity = 'orion' | 'forge' | 'nexus' | 'syndicate'
 interface ChatMessage { role: 'user' | 'assistant'; content: string; entity?: string }
 
+// Syndicate ops that require confirmation before sending
+const SYNDICATE_DANGER_KEYWORDS = ['seed_all','seed all','initialize all','security_override','delete route','remove all','reset']
+function syndicateNeedsApproval(msg: string, entity: string): boolean {
+  if (entity !== 'syndicate') return false
+  const lower = msg.toLowerCase()
+  return SYNDICATE_DANGER_KEYWORDS.some(k => lower.includes(k))
+}
+
 export default function MasterPanel() {
   const [authed, setAuthed] = useState(false)
   const [password, setPassword] = useState('')
@@ -148,6 +156,10 @@ export default function MasterPanel() {
   async function sendChat() {
     if (!chatInput.trim() || chatLoading) return
     const msg = chatInput.trim()
+    // Approval gate for dangerous Syndicate operations
+    if (syndicateNeedsApproval(msg, chatEntity)) {
+      if (!confirm(`⚠️ SYNDICATE APPROVAL REQUIRED\n\nThis command may affect the entire platform:\n"${msg}"\n\nProceed?`)) return
+    }
     setChatInput('')
     const userMsg: ChatMessage = { role: 'user', content: msg }
     const newHistory = [...chatHistory, userMsg]
@@ -210,27 +222,40 @@ export default function MasterPanel() {
   return (
     <div style={{minHeight:'100vh',background:'#070707',display:'flex',color:'#fff',fontFamily:'sans-serif'}}>
       {/* Sidebar */}
-      <div style={{width:220,background:'#0d0d0d',borderRight:'1px solid #1a1a1a',padding:'24px 0',flexShrink:0,display:'flex',flexDirection:'column'}}>
-        <div style={{padding:'0 20px 24px',borderBottom:'1px solid #1a1a1a',marginBottom:16}}>
-          <div style={{color:'#C9A84C',fontWeight:900,fontSize:18,letterSpacing:2}}>LYCHO</div>
-          <div style={{color:'#444',fontSize:11,marginTop:2}}>MASTER PANEL</div>
-        </div>
-        {SECTIONS.map(s => (
-          <div key={s} onClick={()=>loadSection(s)}
-            style={{padding:'10px 20px',cursor:'pointer',background:section===s?'rgba(201,168,76,0.08)':'transparent',
-              borderLeft:section===s?'2px solid #C9A84C':'2px solid transparent',
-              color:section===s?'#C9A84C':'#666',fontSize:13,textTransform:'capitalize',transition:'all 0.2s'}}>
-            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s === 'orion' ? 'Orion Intelligence' : s === 'syndicate' ? 'Syndicate Network' : s.charAt(0).toUpperCase()+s.slice(1)}
+      <div style={{width:230,background:'#080808',borderRight:'1px solid #161616',padding:'0',flexShrink:0,display:'flex',flexDirection:'column'}}>
+        <div style={{padding:'20px 20px 18px',borderBottom:'1px solid #161616'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+            <div style={{width:8,height:8,borderRadius:'50%',background:'#C9A84C',boxShadow:'0 0 8px #C9A84C'}} />
+            <div style={{color:'#C9A84C',fontWeight:900,fontSize:16,letterSpacing:3,fontFamily:'monospace'}}>LYCHO</div>
           </div>
-        ))}
-        <div style={{marginTop:'auto',padding:'16px 20px',borderTop:'1px solid #1a1a1a'}}>
-          {/* Command Center Chat button */}
+          <div style={{color:'#333',fontSize:10,letterSpacing:2,marginLeft:16,fontFamily:'monospace'}}>MASTER CONTROL</div>
+        </div>
+        <nav style={{flex:1,paddingTop:8}}>
+          {SECTIONS.map(s => {
+            const icons: Record<string,string> = {dashboard:'◈',tenants:'◉',forge:'⚙',nexus:'⚡',orion:'◎',syndicate:'⬡',payments:'◆',waitlist:'◌'}
+            const labels: Record<string,string> = {dashboard:'Dashboard',tenants:'Tenants',forge:'Forge Queue',nexus:'Nexus Queue',orion:'Orion Intel',syndicate:'Syndicate',payments:'Payments',waitlist:'Waitlist'}
+            const active = section===s
+            return (
+              <div key={s} onClick={()=>loadSection(s)}
+                style={{padding:'9px 20px',cursor:'pointer',display:'flex',alignItems:'center',gap:10,
+                  background:active?'rgba(201,168,76,0.06)':'transparent',
+                  borderLeft:active?'2px solid #C9A84C':'2px solid transparent',
+                  color:active?'#C9A84C':'#444',fontSize:12,transition:'all 0.15s',
+                  fontFamily:'monospace',letterSpacing:0.5}}>
+                <span style={{fontSize:10,opacity:0.8}}>{icons[s]}</span>
+                <span>{labels[s]}</span>
+                {s==='syndicate'&&<span style={{marginLeft:'auto',fontSize:9,background:'rgba(6,182,212,0.15)',color:'#06b6d4',padding:'1px 5px',borderRadius:3}}>NET</span>}
+              </div>
+            )
+          })}
+        </nav>
+        <div style={{padding:'16px 20px',borderTop:'1px solid #161616',display:'flex',flexDirection:'column',gap:8}}>
           <div onClick={()=>setChatOpen(true)}
-            style={{cursor:'pointer',background:'rgba(167,139,250,0.1)',border:'1px solid rgba(167,139,250,0.3)',borderRadius:8,padding:'8px 12px',marginBottom:12,textAlign:'center',color:'#a78bfa',fontSize:12,fontWeight:700,letterSpacing:1}}>
-            COMMAND CENTER
+            style={{cursor:'pointer',background:'linear-gradient(135deg,rgba(167,139,250,0.12),rgba(6,182,212,0.08))',border:'1px solid rgba(167,139,250,0.25)',borderRadius:8,padding:'8px 12px',textAlign:'center',color:'#a78bfa',fontSize:11,fontWeight:700,letterSpacing:2,fontFamily:'monospace'}}>
+            ◈ COMMAND CENTER
           </div>
           <div onClick={()=>{sessionStorage.clear();setAuthed(false)}}
-            style={{cursor:'pointer',color:'#ef4444',fontSize:13}}>Logout</div>
+            style={{cursor:'pointer',color:'#333',fontSize:11,textAlign:'center',fontFamily:'monospace',letterSpacing:1}}>LOGOUT</div>
         </div>
       </div>
 
@@ -663,8 +688,9 @@ export default function MasterPanel() {
               ))}
             </div>
             {/* Entity label */}
-            <div style={{padding:'8px 20px',background:`${entityColors[chatEntity]}08`}}>
-              <span style={{color:entityColors[chatEntity],fontSize:11,fontWeight:600}}>{entityLabels[chatEntity]}</span>
+            <div style={{padding:'8px 20px',background:`${entityColors[chatEntity]}08`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{color:entityColors[chatEntity],fontSize:11,fontWeight:600,fontFamily:'monospace'}}>{entityLabels[chatEntity]}</span>
+              {chatEntity==='syndicate'&&<span style={{fontSize:10,color:'#f59e0b',background:'rgba(245,158,11,0.1)',padding:'1px 6px',borderRadius:3,border:'1px solid rgba(245,158,11,0.2)'}}>APPROVAL REQUIRED for destructive ops</span>}
             </div>
             {/* Messages */}
             <div style={{flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:12}}>

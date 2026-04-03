@@ -68,6 +68,12 @@ export async function PUT(
 
   if (queueErr) return err(queueErr.message, 'DB_ERROR', 500)
 
+  // Register in Syndicate network
+  try {
+    const { registerAgent } = await import('@/lib/syndicate/syndicate')
+    await registerAgent(entry.agent_type, entry.display_name, false)
+  } catch { /* non-critical */ }
+
   // forge_queue status = 'approved' is the source of truth for marketplace
   // No separate table needed — marketplace API reads directly from forge_queue
 

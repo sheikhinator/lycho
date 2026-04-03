@@ -9,12 +9,13 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// Ultra-minimal prompt — gets response in under 8 seconds
-const FORGE_PROMPT = `Output ONLY a JSON array of 3 AI agent specs. No text before or after. No markdown.
+// Global prompt — builds agents for businesses worldwide
+const FORGE_PROMPT = `Output ONLY a valid JSON array of 3 AI agent specs. No text before or after. No markdown.
 
-[{"agent_type":"slug","display_name":"Name","description":"One line","system_prompt":"You are [Name]. [Role]. Support all languages. Human Sovereignty: escalate complex issues to humans. METADATA: extract {contact_name, query_type, urgency}.","recommended_channels":["whatsapp","email"],"model_complexity":"simple","estimated_value_pkr":35000,"sector_tags":["sector"],"use_case_examples":["Example 1","Example 2","Example 3"],"why_novel":"Gap this fills"}]
+[{"agent_type":"slug","display_name":"Name","description":"One line","system_prompt":"You are [Name]. [Role]. Detect language automatically and respond in kind. Human Sovereignty: escalate complex issues to humans. METADATA: extract {contact_name, query_type, urgency, sentiment}.","recommended_channels":["whatsapp","email"],"model_complexity":"simple","estimated_value_pkr":45000,"sector_tags":["sector"],"use_case_examples":["Example 1","Example 2","Example 3"],"why_novel":"Gap this fills globally"}]
 
-Generate 3 agents for Pakistani/GCC businesses. Real problems only. Return array immediately.`
+Build agents for businesses WORLDWIDE — USA, UK, UAE, Pakistan, India, Germany, Australia, Canada, Saudi Arabia, any country.
+Focus on: real business pain points, compliance, automation, productivity. Global problems only. Return array immediately.`
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyAgent = Record<string, any>
@@ -131,6 +132,11 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
     if (!error) {
       inserted++
       console.log('Inserted:', agent.agent_type)
+      // Pre-register in Syndicate network
+      try {
+        const { registerAgent } = await import('@/lib/syndicate/syndicate')
+        await registerAgent(agent.agent_type, agent.display_name, false)
+      } catch { /* non-critical */ }
     } else {
       console.error('Insert error:', agent.agent_type, error.message)
     }

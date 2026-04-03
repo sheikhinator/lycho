@@ -389,3 +389,61 @@ export async function seedAgentRegistry(): Promise<{ seeded: number }> {
   }
   return { seeded }
 }
+
+// ── PERMISSIONS ──────────────────────────────────────────────────────────────
+
+export const SYNDICATE_PERMISSIONS: Record<string, string[]> = {
+  orion:      ['read_all','write_all','execute_all','manage_agents','manage_routes','security_override'],
+  forge:      ['read_all','write_forge_queue','write_marketplace','read_intelligence'],
+  nexus:      ['read_automations','write_automations','read_conversations','trigger_webhooks'],
+  guardian:   ['read_all','block_messages','log_incidents','alert_orion'],
+  veritas:    ['read_all_responses','score_responses','flag_quality'],
+  syndicate:  ['read_all','write_all','execute_all','manage_routes','manage_agents','full_platform_access'],
+  intake:     ['read_contacts','write_conversations','escalate_to_any','request_research'],
+  research:   ['read_all_data','write_intelligence','escalate_to_compliance'],
+  operations: ['read_schedules','write_tasks','trigger_automations'],
+  client:     ['read_contact_history','write_relationship_data','request_analyst'],
+  analyst:    ['read_all_metrics','write_reports','request_research'],
+  compliance: ['read_regulations','write_compliance_reports','alert_orion'],
+  content:    ['read_brand_context','write_content','request_research'],
+  default:    ['read_own_context','write_own_responses','escalate_to_core','request_help'],
+}
+
+export function getAgentPermissions(agentType: string): string[] {
+  return SYNDICATE_PERMISSIONS[agentType] || SYNDICATE_PERMISSIONS.default
+}
+
+export async function checkPermission(agentType: string, permission: string): Promise<boolean> {
+  const perms = getAgentPermissions(agentType)
+  return perms.includes(permission) || perms.includes('full_platform_access') || perms.includes('read_all')
+}
+
+// ── REGISTER AGENT ───────────────────────────────────────────────────────────
+
+export async function registerAgent(agentType: string, displayName: string, isUniverseA = false): Promise<void> {
+  await supabaseAdmin.from('agent_registry').upsert({
+    agent_type: agentType,
+    display_name: displayName,
+    category: isUniverseA ? 'universe_a' : 'specialist',
+    is_universe_a: isUniverseA,
+    is_core: false,
+    can_receive_messages: true,
+    status: 'active',
+    registered_at: new Date().toISOString()
+  }, { onConflict: 'agent_type' })
+
+  // Auto-create default routes
+  const routes = [
+    { from_agent: agentType, to_agent: 'orion',    route_type: 'reporting',    bidirectional: false },
+    { from_agent: agentType, to_agent: 'guardian',  route_type: 'security',     bidirectional: false },
+    { from_agent: agentType, to_agent: 'veritas',   route_type: 'quality',      bidirectional: false },
+    { from_agent: 'orion',   to_agent: agentType,   route_type: 'optimisation', bidirectional: false },
+  ]
+  for (const route of routes) {
+    try {
+      await supabaseAdmin.from('syndicate_routes')
+        .upsert(route, { onConflict: 'from_agent,to_agent' })
+    } catch { /* ignore duplicates */ }
+  }
+  console.log(`[SYNDICATE] Registered: ${agentType}`)
+}

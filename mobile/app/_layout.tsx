@@ -3,12 +3,12 @@ import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 
 export default function RootLayout() {
-  const [checked, setChecked] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/login')
-      setChecked(true)
+      setReady(true)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -18,10 +18,10 @@ export default function RootLayout() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (!checked) return null
+  if (!ready) return null
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#070707' } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="dashboard" />

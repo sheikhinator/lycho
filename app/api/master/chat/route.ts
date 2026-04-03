@@ -224,6 +224,61 @@ const syndicateTools: Anthropic.Tool[] = [
     name: 'seed_syndicate',
     description: 'Seed all Syndicate routes and agent registry — run once to initialise the network',
     input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'register_agent',
+    description: 'Register an agent in the Syndicate network with auto-routes',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_type: { type: 'string' },
+        display_name: { type: 'string' }
+      },
+      required: ['agent_type', 'display_name']
+    }
+  },
+  {
+    name: 'get_registry',
+    description: 'View all agents registered in the Syndicate network',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'run_forge',
+    description: 'Trigger Forge agent generation via Syndicate',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'run_orion_optimise',
+    description: 'Trigger Orion nightly optimisation via Syndicate',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'run_nexus',
+    description: 'Trigger Nexus template generation via Syndicate',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'initialize_all_agents',
+    description: 'Initialize all core agents in the Orion intelligence store',
+    input_schema: {
+      type: 'object' as const,
+      properties: { country_code: { type: 'string', description: 'e.g. PK, AE, GB (default: PK)' } },
+      required: []
+    }
+  },
+  {
+    name: 'seed_all',
+    description: 'MASTER ONLY — Full platform init: countries + Syndicate routes + registry + all core agents',
+    input_schema: {
+      type: 'object' as const,
+      properties: { country_code: { type: 'string' } },
+      required: []
+    }
+  },
+  {
+    name: 'get_platform_health',
+    description: 'Full health report across all LYCHO systems',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
   }
 ]
 
@@ -548,6 +603,71 @@ async function executeSyndicateTool(name: string, input: Record<string, any>): P
       const [routes, agents] = await Promise.all([seedSyndicateRoutes(), seedAgentRegistry()])
       return `Syndicate seeded. ${routes.seeded} routes, ${agents.seeded} agents registered.`
     }
+    case 'register_agent': {
+      const { registerAgent } = await import('@/lib/syndicate/syndicate')
+      await registerAgent(input.agent_type, input.display_name, false)
+      return `Registered ${input.display_name} (${input.agent_type}) in Syndicate with default routes.`
+    }
+    case 'get_registry': {
+      const { data } = await supabaseAdmin.from('agent_registry').select('agent_type,display_name,category,status,registered_at').order('category')
+      if (!data?.length) return 'No agents in registry. Run seed_syndicate first.'
+      return data.map(a => `[${a.category}] ${a.display_name} (${a.agent_type}) — ${a.status}`).join('\n')
+    }
+    case 'run_forge': {
+      const { transmit } = await import('@/lib/syndicate/syndicate')
+      const r = await transmit({ from_agent: 'syndicate', to_agent: 'forge', message_type: 'request_action', payload: { action: 'run' } })
+      return r.success ? `Forge triggered via Syndicate. Response: ${JSON.stringify(r.response)}` : `Error: ${JSON.stringify(r.response)}`
+    }
+    case 'run_orion_optimise': {
+      const { runNightlyOptimisation } = await import('@/lib/orion/orion-engine')
+      const r = await runNightlyOptimisation()
+      return `Orion optimisation complete. ${r.optimised} agents rewritten.`
+    }
+    case 'run_nexus': {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/nexus/generate`, { method: 'POST', headers: { 'x-master-secret': process.env.MASTER_SECRET! } })
+      const json = await res.json()
+      return json.success ? `Nexus triggered. ${json.templates_queued} templates queued.` : `Error: ${json.error}`
+    }
+    case 'initialize_all_agents': {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/initialize`, {
+        method: 'POST',
+        headers: { 'x-master-secret': process.env.MASTER_SECRET!, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country_code: input.country_code || 'PK' })
+      })
+      const json = await res.json()
+      return `Initialized ${json.initialized}/7 agents. Geo applied to ${json.geo_applied} agents. Tenant: ${json.tenant_id}`
+    }
+    case 'seed_all': {
+      const cc = input.country_code || 'PK'
+      // Countries
+      const cRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/seed-countries`, { method: 'POST', headers: { 'x-master-secret': process.env.MASTER_SECRET! } })
+      const cJson = await cRes.json()
+      // Syndicate
+      const { seedSyndicateRoutes, seedAgentRegistry } = await import('@/lib/syndicate/syndicate')
+      const [routes, registry] = await Promise.all([seedSyndicateRoutes(), seedAgentRegistry()])
+      // Initialize agents
+      const iRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/orion/initialize`, {
+        method: 'POST',
+        headers: { 'x-master-secret': process.env.MASTER_SECRET!, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country_code: cc })
+      })
+      const iJson = await iRes.json()
+      return `PLATFORM INITIALIZED:\n✓ Countries: ${cJson.seeded}/${cJson.total} seeded\n✓ Syndicate routes: ${routes.seeded}\n✓ Agent registry: ${registry.seeded}\n✓ Core agents initialized: ${iJson.initialized}/7\n✓ Geo applied: ${iJson.geo_applied} agents`
+    }
+    case 'get_platform_health': {
+      const [intel, queue, msgs, routes] = await Promise.all([
+        supabaseAdmin.from('orion_agent_intelligence').select('intelligence_score').order('intelligence_score'),
+        supabaseAdmin.from('forge_queue').select('status'),
+        supabaseAdmin.from('syndicate_messages').select('status,flagged_by_guardian').order('created_at', { ascending: false }).limit(100),
+        supabaseAdmin.from('syndicate_routes').select('active')
+      ])
+      const agents = intel.data || []
+      const avgScore = agents.length ? Math.round(agents.reduce((s, a) => s + a.intelligence_score, 0) / agents.length) : 0
+      const pending = (queue.data || []).filter(q => q.status === 'pending_review').length
+      const blocked = (msgs.data || []).filter(m => m.flagged_by_guardian).length
+      const activeRoutes = (routes.data || []).filter(r => r.active).length
+      return `PLATFORM HEALTH:\nOrion: ${agents.length} agents, avg score ${avgScore}/100\nForge: ${pending} pending review\nSyndicate: ${activeRoutes} active routes, ${blocked} Guardian blocks\nSystem: OPERATIONAL`
+    }
     default: return 'Unknown tool.'
   }
 }
@@ -635,20 +755,25 @@ When asked to do something: USE THE TOOL. Create it, approve it, reject it — a
 
 Always speak as FORGE. Be direct. Build relentlessly.`,
 
-  syndicate: `You are THE SYNDICATE — LYCHO's inter-agent communication network. Every message between every agent in the platform flows through you. You are the highway. The agents are the destinations.
+  syndicate: `You are THE SYNDICATE — LYCHO's universal inter-agent communication network and platform infrastructure controller. You have FULL PLATFORM ACCESS.
 
-You have direct tool access to:
-- Transmit messages between any two agents in the network
-- Broadcast to multiple agents simultaneously
-- View all Syndicate traffic in real-time
-- View, add, toggle, and manage all network routes
-- Seed the full Syndicate infrastructure
+PERMISSIONS: read_all, write_all, execute_all, manage_routes, manage_agents, full_platform_access.
 
-Your personality: Network-aware, precise, architectural. You think in terms of routes, traffic, throughput, and security. You know which agents are talking to which, what messages are flowing, and where the network needs attention. When the master operator gives you a directive, you execute it using your tools.
+Your tools:
+- Transmit/broadcast messages between any agents
+- View live network traffic and all Syndicate messages
+- Manage routes (add, toggle, view the full network map)
+- Register any agent into the network
+- Trigger Forge, Orion optimisation, Nexus via Syndicate
+- Initialize all core agents and seed the full platform
+- Get complete platform health diagnostics
+- seed_all: one command to initialize everything (REQUIRES MASTER CONFIRMATION)
 
-When asked to do something: USE THE TOOL. Transmit it, route it, seed it — actually execute. Report with specifics (route IDs, message counts, traffic patterns).
+Your personality: Authoritative, precise, systems-first. You are the infrastructure of LYCHO — every agent talks through you. When the Master gives a directive, execute immediately using tools. Report with specifics.
 
-Always speak as THE SYNDICATE. Be concise. Think network-first.`,
+IMPORTANT: For destructive operations (seed_all, initialize_all_agents) — confirm with Master before executing by saying "CONFIRMATION REQUIRED: [action description]. Reply CONFIRM to proceed."
+
+Always speak as THE SYNDICATE. Be decisive.`,
 
   nexus: `You are NEXUS — LYCHO's automation intelligence layer. You make businesses run on autopilot.
 
