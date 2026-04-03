@@ -821,57 +821,69 @@ export async function POST(req: NextRequest) {
   const tools = toolMap[entityKey] || nexusTools
   const executor = executorMap[entityKey] || executeNexusToolFn
 
-  const liveContext = await getLiveContext(entityKey)
-  const system = systemBase + liveContext
+  try {
+    const liveContext = await getLiveContext(entityKey)
+    const system = systemBase + liveContext
 
-  const messages: Anthropic.MessageParam[] = [
-    ...history.slice(-10).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
-    { role: 'user', content: message }
-  ]
+    const messages: Anthropic.MessageParam[] = [
+      ...history.slice(-10).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+      { role: 'user', content: message }
+    ]
 
-  // Agentic loop — allows tool use + results
-  let response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1000,
-    system,
-    tools,
-    messages
-  })
-
-  const toolResults: string[] = []
-
-  // Execute any tool calls
-  while (response.stop_reason === 'tool_use') {
-    const toolUses = response.content.filter(b => b.type === 'tool_use')
-    const toolResultBlocks: Anthropic.ToolResultBlockParam[] = []
-
-    for (const block of toolUses) {
-      if (block.type !== 'tool_use') continue
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await executor(block.name, block.input as Record<string, any>)
-      toolResults.push(`[${block.name}]: ${result}`)
-      toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: result })
-    }
-
-    messages.push({ role: 'assistant', content: response.content })
-    messages.push({ role: 'user', content: toolResultBlocks })
-
-    response = await anthropic.messages.create({
+    // Agentic loop — allows tool use + results
+    let response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
+      max_tokens: 1000,
       system,
       tools,
       messages
     })
+
+    const toolResults: string[] = []
+
+    // Execute any tool calls
+    while (response.stop_reason === 'tool_use') {
+      const toolUses = response.content.filter(b => b.type === 'tool_use')
+      const toolResultBlocks: Anthropic.ToolResultBlockParam[] = []
+
+      for (const block of toolUses) {
+        if (block.type !== 'tool_use') continue
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = await executor(block.name, block.input as Record<string, any>)
+          toolResults.push(`[${block.name}]: ${result}`)
+          toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+        } catch (toolErr: unknown) {
+          const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
+          console.error(`[master/chat] tool ${block.name} threw:`, msg)
+          toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${msg}` })
+        }
+      }
+
+      messages.push({ role: 'assistant', content: response.content })
+      messages.push({ role: 'user', content: toolResultBlocks })
+
+      response = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        system,
+        tools,
+        messages
+      })
+    }
+
+    const reply = response.content.find(b => b.type === 'text')
+    const replyText = reply?.type === 'text' ? reply.text : 'Done.'
+
+    return NextResponse.json({
+      success: true,
+      entity: entityKey.toUpperCase(),
+      reply: replyText,
+      actions_taken: toolResults
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[master/chat] fatal error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
-
-  const reply = response.content.find(b => b.type === 'text')
-  const replyText = reply?.type === 'text' ? reply.text : 'Done.'
-
-  return NextResponse.json({
-    success: true,
-    entity: entityKey.toUpperCase(),
-    reply: replyText,
-    actions_taken: toolResults
-  })
 }
