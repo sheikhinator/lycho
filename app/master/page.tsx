@@ -544,14 +544,24 @@ export default function MasterPanel() {
                     <h2 style={{color:'#06b6d4',fontSize:24,fontWeight:900,letterSpacing:1,margin:0}}>THE SYNDICATE</h2>
                     <p style={{color:'#555',fontSize:12,margin:'4px 0 0'}}>Inter-agent communication network — {data.active_routes||0} active routes</p>
                   </div>
-                  <button onClick={async()=>{
-                    const res = await fetch('/api/syndicate/seed',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
-                    const json = await res.json()
-                    if(json.success){alert(`Seeded: ${json.routes_seeded} routes, ${json.agents_seeded} agents`);loadSection('syndicate')}
-                    else alert(`Error: ${json.error}`)
-                  }} style={{background:'#0e4a5e',color:'#06b6d4',border:'1px solid #0891b2',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
-                    Seed Syndicate
-                  </button>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={async()=>{
+                      const res = await fetch('/api/syndicate/register-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const json = await res.json()
+                      alert(json.error ? `Error: ${json.error}` : `Registered ${json.registered}/${json.total} agents, ${json.routes_added} cross-sector routes added`)
+                      loadSection('syndicate')
+                    }} style={{background:'#0e4a5e',color:'#06b6d4',border:'1px solid #0891b2',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                      Register All Agents
+                    </button>
+                    <button onClick={async()=>{
+                      const res = await fetch('/api/syndicate/seed',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const json = await res.json()
+                      if(json.success){alert(`Seeded: ${json.routes_seeded} routes, ${json.agents_seeded} agents`);loadSection('syndicate')}
+                      else alert(`Error: ${json.error}`)
+                    }} style={{background:'#0e4a5e',color:'#06b6d4',border:'1px solid #0891b2',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                      Seed Syndicate
+                    </button>
+                  </div>
                 </div>
                 {/* Stats */}
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:16,marginBottom:32}}>
