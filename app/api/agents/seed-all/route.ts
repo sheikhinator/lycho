@@ -15,26 +15,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const errors: string[] = []
+  const errors: { agent_type: string; error: string }[] = []
   let seeded = 0
+  let failed = 0
 
-  const rows = Object.entries(ALL_AGENTS_PROMPTS).map(([agent_type, system_prompt]) => ({
-    agent_type,
-    display_name: ALL_AGENTS_META[agent_type]?.display_name ?? agent_type,
-    description:  ALL_AGENTS_META[agent_type]?.description ?? '',
-    system_prompt,
-    model_complexity: 'simple' as const,
-    status: 'approved' as const,
-  }))
+  for (const [agent_type, system_prompt] of Object.entries(ALL_AGENTS_PROMPTS)) {
+    try {
+      const { error } = await supabaseAdmin
+        .from('marketplace_agents')
+        .upsert({
+          agent_type,
+          display_name: ALL_AGENTS_META[agent_type]?.display_name ?? agent_type,
+          description:  ALL_AGENTS_META[agent_type]?.description ?? '',
+          system_prompt,
+          model_complexity: 'simple',
+          status: 'approved',
+        }, { onConflict: 'agent_type' })
 
-  // Batch upsert in chunks of 50
-  for (let i = 0; i < rows.length; i += 50) {
-    const { error } = await supabaseAdmin
-      .from('marketplace_agents')
-      .upsert(rows.slice(i, i + 50), { onConflict: 'agent_type' })
-    if (error) errors.push(error.message)
-    else seeded += rows.slice(i, i + 50).length
+      if (error) {
+        console.error(`[seed-all] FAILED ${agent_type}:`, error.message, error.details, error.hint)
+        errors.push({ agent_type, error: `${error.message} | ${error.details ?? ''} | ${error.hint ?? ''}` })
+        failed++
+      } else {
+        seeded++
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[seed-all] EXCEPTION ${agent_type}:`, msg)
+      errors.push({ agent_type, error: msg })
+      failed++
+    }
   }
 
-  return NextResponse.json({ seeded, total: rows.length, errors })
+  return NextResponse.json({ seeded, failed, total: seeded + failed, errors })
 }
