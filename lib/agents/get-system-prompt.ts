@@ -1,4 +1,5 @@
 import { CATALOGUE_PROMPTS } from './catalogue-prompts'
+import { ALL_AGENTS_PROMPTS } from './all-agents'
 import { buildIntakeSystemPrompt, type ContactProfile } from './intake-agent'
 import { buildResearchSystemPrompt }   from './research-agent'
 import { buildOperationsSystemPrompt } from './operations-agent'
@@ -58,12 +59,17 @@ export async function getSystemPrompt(
     }
   }
 
-  // 3. Static catalogue
+  // 3. ALL_AGENTS (500 specialist agents)
+  if (ALL_AGENTS_PROMPTS[agentType]) {
+    return { prompt: ALL_AGENTS_PROMPTS[agentType], model: 'simple' }
+  }
+
+  // 4. Static catalogue
   if (CATALOGUE_PROMPTS[agentType]) {
     return { prompt: CATALOGUE_PROMPTS[agentType], model: 'simple' }
   }
 
-  // 4. Auto-generate via Haiku and cache
+  // 5. Auto-generate via Haiku and cache
   const { Anthropic } = await import('@anthropic-ai/sdk')
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const response = await anthropic.messages.create({

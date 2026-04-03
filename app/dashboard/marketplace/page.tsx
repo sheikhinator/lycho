@@ -257,6 +257,19 @@ export default function MarketplacePage() {
                   {agent.description}
                 </p>
 
+                {/* Channel status */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {([
+                    ['Web Widget', true], ['Telegram', true], ['Email', true],
+                    ['WhatsApp', false], ['SMS', false], ['Instagram', false], ['Facebook', false], ['Slack', false],
+                  ] as [string, boolean][]).map(([label, live]) => (
+                    <span key={label} className="text-[10px] px-1.5 py-0.5 rounded font-sans"
+                      style={{ background: live ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.1)', color: live ? '#4ade80' : '#fbbf24' }}>
+                      {live ? '● ' : '◌ '}{label}
+                    </span>
+                  ))}
+                </div>
+
                 {/* Deploy button */}
                 <button
                   className="w-full py-2 rounded-lg text-xs font-sans font-medium transition-opacity"

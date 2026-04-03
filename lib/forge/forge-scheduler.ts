@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
 )
 
 // Global prompt — builds agents for businesses worldwide
-const FORGE_PROMPT = `Output ONLY a valid JSON array of 3 AI agent specs. No text before or after. No markdown.
+const FORGE_PROMPT = `Output ONLY a valid JSON array of 5 AI agent specs. No text before or after. No markdown.
 
 [{"agent_type":"slug","display_name":"Name","description":"One line","system_prompt":"You are [Name]. [Role]. Detect language automatically and respond in kind. Human Sovereignty: escalate complex issues to humans. METADATA: extract {contact_name, query_type, urgency, sentiment}.","recommended_channels":["whatsapp","email"],"model_complexity":"simple","estimated_value_pkr":45000,"sector_tags":["sector"],"use_case_examples":["Example 1","Example 2","Example 3"],"why_novel":"Gap this fills globally"}]
 

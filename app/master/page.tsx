@@ -335,10 +335,19 @@ export default function MasterPanel() {
               <div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:forgeResult?12:24}}>
                   <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,letterSpacing:1}}>FORGE QUEUE</h2>
-                  <button onClick={runForge} disabled={forgeLoading}
-                    style={{background:forgeLoading?'#7a6130':'#C9A84C',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:forgeLoading?'not-allowed':'pointer'}}>
-                    {forgeLoading ? 'Running…' : 'Run Forge Now'}
-                  </button>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={async()=>{
+                      const res = await fetch('/api/agents/seed-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const json = await res.json()
+                      setForgeResult(json.errors?.length ? `⚠️ Seeded ${json.seeded}/${json.total} (${json.errors.length} errors)` : `✅ Seeded ${json.seeded} agents to marketplace`)
+                    }} style={{background:'#1e1b4b',color:'#a78bfa',border:'1px solid #3730a3',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                      Seed All Agents
+                    </button>
+                    <button onClick={runForge} disabled={forgeLoading}
+                      style={{background:forgeLoading?'#7a6130':'#C9A84C',color:'#070707',border:'none',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:forgeLoading?'not-allowed':'pointer'}}>
+                      {forgeLoading ? 'Running…' : 'Run Forge Now'}
+                    </button>
+                  </div>
                 </div>
                 {forgeResult && <p style={{color:forgeResult.startsWith('✅')?'#34d399':'#ef4444',fontSize:13,marginBottom:16}}>{forgeResult}</p>}
                 {(data.queue||[]).length===0 && <p style={{color:'#444'}}>No agents in queue. Run Forge to generate new agents.</p>}
