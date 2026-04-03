@@ -120,10 +120,10 @@ export async function POST(req: NextRequest) {
 
   if (!tenant) return err('Tenant not found', 'NOT_FOUND', 404)
 
-  // Plan check
-  const planStatus = (tenant.plan_status as string) ?? 'pending'
-  if (planStatus === 'pending' || planStatus === 'expired') {
-    return err('Active plan required. Please activate your account.', 'PLAN_REQUIRED', 403)
+  // Plan check — allow trial and active; block only expired
+  const planStatus = (tenant.plan_status as string) ?? 'trial'
+  if (planStatus === 'expired') {
+    return err('Your plan has expired. Please renew to continue.', 'PLAN_REQUIRED', 403)
   }
   const { data: agentRows } = await supabase.from('agents').select('interactions_count').eq('tenant_id', tenantId)
   const totalInteractions = (agentRows ?? []).reduce((s, a) => s + ((a.interactions_count as number) || 0), 0)

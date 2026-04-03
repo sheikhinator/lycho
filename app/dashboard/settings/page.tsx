@@ -160,6 +160,8 @@ function ProfileTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [form, setForm] = useState({
     business_name: '', business_email: '', business_phone: '',
     sector: '', country: 'PK', currency: 'PKR',
@@ -180,6 +182,26 @@ function ProfileTab({ tenantId }: { tenantId: string }) {
         setLoading(false)
       })
   }, [tenantId])
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { toast('Image must be under 2MB', 'error'); return }
+    setUploading(true)
+    try {
+      const sb = createClientSupabase()
+      const ext = file.name.split('.').pop()
+      const path = `logos/${tenantId}.${ext}`
+      const { error: uploadError } = await sb.storage.from('tenant-assets').upload(path, file, { upsert: true })
+      if (uploadError) { toast(uploadError.message, 'error'); return }
+      const { data: { publicUrl } } = sb.storage.from('tenant-assets').getPublicUrl(path)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sb.from('tenants') as any).update({ logo_url: publicUrl }).eq('id', tenantId)
+      setLogoUrl(publicUrl)
+      toast('Logo updated', 'success')
+    } catch { toast('Upload failed', 'error') }
+    finally { setUploading(false); e.target.value = '' }
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -208,17 +230,22 @@ function ProfileTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-6 max-w-lg">
-      {/* Avatar placeholder */}
+      {/* Logo upload */}
       <div className="flex items-center gap-4">
-        <div
-          className="w-16 h-16 rounded-full flex items-center justify-center font-bebas text-2xl tracking-wider flex-shrink-0"
-          style={{ background: 'rgba(201,168,76,0.1)', border: '2px solid rgba(201,168,76,0.3)', color: '#C9A84C' }}
-        >
-          {initials}
-        </div>
+        <label className="cursor-pointer relative group">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center font-bebas text-2xl tracking-wider flex-shrink-0 overflow-hidden"
+            style={{ background: 'rgba(201,168,76,0.1)', border: '2px solid rgba(201,168,76,0.3)', color: '#C9A84C' }}>
+            {logoUrl ? <img src={logoUrl} alt="logo" className="w-full h-full object-cover" /> : initials}
+          </div>
+          <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ background: 'rgba(0,0,0,0.6)', fontSize: 10, color: '#C9A84C' }}>
+            {uploading ? '…' : 'Upload'}
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploading} />
+        </label>
         <div>
           <p className="text-sm font-sans font-medium" style={{ color: '#F0EBE1' }}>{form.business_name || 'Your Business'}</p>
-          <p className="text-xs font-sans mt-0.5" style={{ color: '#6b6b6b' }}>Logo upload available in a future update</p>
+          <p className="text-xs font-sans mt-0.5" style={{ color: '#6b6b6b' }}>Click logo to upload · Max 2MB</p>
         </div>
       </div>
 

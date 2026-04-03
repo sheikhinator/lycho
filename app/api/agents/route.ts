@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       display_name: body.display_name ?? null,
       channels: body.channels ?? [],
       config: body.config ?? {},
-      status: 'configuring',
+      status: 'active',
       version: 1,
     })
     .select()

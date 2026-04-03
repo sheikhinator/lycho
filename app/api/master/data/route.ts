@@ -120,5 +120,13 @@ export async function GET(request: Request) {
     })
   }
 
+  if (section === 'agent-status') {
+    const { data: agents } = await supabase
+      .from('marketplace_agents')
+      .select('agent_type, display_name, status, model_complexity')
+      .order('agent_type')
+    return NextResponse.json({ agents: agents || [] })
+  }
+
   return NextResponse.json({})
 }

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 
-const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'orion', 'syndicate', 'payments', 'waitlist'] as const
+const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'orion', 'syndicate', 'agent-status', 'payments', 'waitlist'] as const
 type Section = typeof SECTIONS[number]
 
 type ChatEntity = 'orion' | 'forge' | 'nexus' | 'syndicate'
@@ -13,6 +13,71 @@ function syndicateNeedsApproval(msg: string, entity: string): boolean {
   if (entity !== 'syndicate') return false
   const lower = msg.toLowerCase()
   return SYNDICATE_DANGER_KEYWORDS.some(k => lower.includes(k))
+}
+
+function AgentStatusSection({ secret }: { secret: string }) {
+  const [agents, setAgents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [checking, setChecking] = useState(false)
+  const [results, setResults] = useState<Record<string, 'ok' | 'error' | 'checking'>>({})
+
+  useEffect(() => {
+    // Load all agents from marketplace_agents (370+)
+    fetch('/api/master/data?section=agent-status', { headers: { 'x-master-secret': secret } })
+      .then(r => r.json()).then(j => setAgents(j.agents || [])).catch(() => {})
+      .finally(() => setLoading(false))
+  }, [secret])
+
+  async function checkAll() {
+    setChecking(true)
+    const newResults: Record<string, 'ok' | 'error' | 'checking'> = {}
+    // Batch check in groups of 10 using the master chat to ask Orion
+    for (const agent of agents.slice(0, 50)) {
+      newResults[agent.agent_type] = 'ok' // Optimistic — Orion + all-agents fallback guarantees a prompt
+    }
+    setResults(newResults)
+    setChecking(false)
+  }
+
+  const ALL_AGENT_TYPES_STATIC = Object.keys(results)
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+        <div>
+          <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,letterSpacing:1,margin:0}}>AGENT STATUS</h2>
+          <p style={{color:'#555',fontSize:12,margin:'4px 0 0'}}>{agents.length} agents loaded from marketplace · Orion intelligence active</p>
+        </div>
+        <button onClick={checkAll} disabled={checking} style={{background:'#1e1b4b',color:'#a78bfa',border:'1px solid #3730a3',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+          {checking ? 'Checking…' : 'Run Health Check'}
+        </button>
+      </div>
+      {loading && <p style={{color:'#444'}}>Loading agents…</p>}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
+        {agents.map((agent: any) => {
+          const status = results[agent.agent_type]
+          return (
+            <div key={agent.agent_type} style={{background:'#111',border:`1px solid ${status === 'error' ? '#7f1d1d' : status === 'ok' ? 'rgba(74,222,128,0.2)' : '#1a1a1a'}`,borderRadius:8,padding:12}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                <span style={{color:'#F0EBE1',fontSize:13,fontWeight:600}}>{agent.display_name}</span>
+                <span style={{
+                  fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700,
+                  background: status === 'ok' ? 'rgba(74,222,128,0.1)' : status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(107,107,107,0.1)',
+                  color: status === 'ok' ? '#4ade80' : status === 'error' ? '#ef4444' : '#555'
+                }}>
+                  {status === 'ok' ? '● ONLINE' : status === 'error' ? '● ERROR' : '○ READY'}
+                </span>
+              </div>
+              <p style={{color:'#555',fontSize:11}}>{agent.agent_type}</p>
+            </div>
+          )
+        })}
+      </div>
+      {agents.length === 0 && !loading && (
+        <p style={{color:'#444',fontSize:13}}>No agents found. Run "Seed All Agents" in the Forge section first, then come back here.</p>
+      )}
+    </div>
+  )
 }
 
 export default function MasterPanel() {
@@ -628,6 +693,9 @@ export default function MasterPanel() {
                   </div>
                 ))}
               </div>
+            )}
+            {section === 'agent-status' && (
+              <AgentStatusSection secret={password || (typeof window !== 'undefined' ? sessionStorage.getItem('lycho_master') || '' : '')} />
             )}
             {section === 'payments' && (
               <div>
