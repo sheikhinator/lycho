@@ -224,6 +224,28 @@ Return only the new system prompt.`
   }
 
   console.log('=== ORION OPTIMISATION DONE === Optimised:', optimised)
+
+  // Broadcast results via Syndicate
+  if (optimised > 0) {
+    try {
+      const { transmit } = await import('@/lib/syndicate/syndicate')
+      await Promise.all([
+        transmit({
+          from_agent: 'orion',
+          to_agent: 'forge',
+          message_type: 'share_intelligence',
+          payload: { optimised, message: `${optimised} agents rewritten. Update your build targets.` }
+        }),
+        transmit({
+          from_agent: 'orion',
+          to_agent: 'nexus',
+          message_type: 'share_intelligence',
+          payload: { message: `${optimised} agents optimised. Consider new automation templates.` }
+        })
+      ])
+    } catch { /* non-critical */ }
+  }
+
   return { optimised }
 }
 

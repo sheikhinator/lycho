@@ -1,10 +1,10 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 
-const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'orion', 'payments', 'waitlist'] as const
+const SECTIONS = ['dashboard', 'tenants', 'forge', 'nexus', 'orion', 'syndicate', 'payments', 'waitlist'] as const
 type Section = typeof SECTIONS[number]
 
-type ChatEntity = 'orion' | 'forge' | 'nexus'
+type ChatEntity = 'orion' | 'forge' | 'nexus' | 'syndicate'
 interface ChatMessage { role: 'user' | 'assistant'; content: string; entity?: string }
 
 export default function MasterPanel() {
@@ -187,8 +187,8 @@ export default function MasterPanel() {
     return () => clearInterval(interval)
   }, [section, authed])
 
-  const entityColors: Record<ChatEntity, string> = { orion: '#a78bfa', forge: '#f59e0b', nexus: '#34d399' }
-  const entityLabels: Record<ChatEntity, string> = { orion: 'ORION — Intelligence', forge: 'FORGE — Agent Builder', nexus: 'NEXUS — Automations' }
+  const entityColors: Record<ChatEntity, string> = { orion: '#a78bfa', forge: '#f59e0b', nexus: '#34d399', syndicate: '#06b6d4' }
+  const entityLabels: Record<ChatEntity, string> = { orion: 'ORION — Intelligence', forge: 'FORGE — Agent Builder', nexus: 'NEXUS — Automations', syndicate: 'SYNDICATE — Network Highway' }
 
   if (!authed) return (
     <div style={{minHeight:'100vh',background:'#070707',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -220,7 +220,7 @@ export default function MasterPanel() {
             style={{padding:'10px 20px',cursor:'pointer',background:section===s?'rgba(201,168,76,0.08)':'transparent',
               borderLeft:section===s?'2px solid #C9A84C':'2px solid transparent',
               color:section===s?'#C9A84C':'#666',fontSize:13,textTransform:'capitalize',transition:'all 0.2s'}}>
-            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s === 'orion' ? 'Orion Intelligence' : s.charAt(0).toUpperCase()+s.slice(1)}
+            {s === 'forge' ? 'Forge Queue' : s === 'nexus' ? 'Nexus Queue' : s === 'payments' ? 'Payments' : s === 'orion' ? 'Orion Intelligence' : s === 'syndicate' ? 'Syndicate Network' : s.charAt(0).toUpperCase()+s.slice(1)}
           </div>
         ))}
         <div style={{marginTop:'auto',padding:'16px 20px',borderTop:'1px solid #1a1a1a'}}>
@@ -503,6 +503,88 @@ export default function MasterPanel() {
                 )}
               </div>
             )}
+            {section === 'syndicate' && (
+              <div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:12}}>
+                  <div>
+                    <h2 style={{color:'#06b6d4',fontSize:24,fontWeight:900,letterSpacing:1,margin:0}}>THE SYNDICATE</h2>
+                    <p style={{color:'#555',fontSize:12,margin:'4px 0 0'}}>Inter-agent communication network — {data.active_routes||0} active routes</p>
+                  </div>
+                  <button onClick={async()=>{
+                    const res = await fetch('/api/syndicate/seed',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                    const json = await res.json()
+                    if(json.success){alert(`Seeded: ${json.routes_seeded} routes, ${json.agents_seeded} agents`);loadSection('syndicate')}
+                    else alert(`Error: ${json.error}`)
+                  }} style={{background:'#0e4a5e',color:'#06b6d4',border:'1px solid #0891b2',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                    Seed Syndicate
+                  </button>
+                </div>
+                {/* Stats */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:16,marginBottom:32}}>
+                  {[
+                    {label:'Messages Today',    value:data.messages_today||0,    color:'#06b6d4'},
+                    {label:'Active Routes',      value:data.active_routes||0,     color:'#06b6d4'},
+                    {label:'Total Routes',       value:data.total_routes||0,      color:'#666'},
+                    {label:'Guardian Blocks',    value:data.guardian_blocks||0,   color:data.guardian_blocks>0?'#ef4444':'#34d399'},
+                    {label:'Avg Quality Score',  value:`${data.avg_quality||0}/100`, color:'#06b6d4'},
+                    {label:'Top Agent Pair',     value:data.top_pair||'—',       color:'#888'},
+                  ].map(k=>(
+                    <div key={k.label} style={{background:'#111',border:'1px solid #1a1a1a',borderRadius:8,padding:16}}>
+                      <div style={{color:'#444',fontSize:11,marginBottom:4}}>{k.label}</div>
+                      <div style={{color:k.color,fontSize:k.label==='Top Agent Pair'?13:22,fontWeight:700}}>{k.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Routes Table */}
+                <h3 style={{color:'#888',fontSize:13,marginBottom:12,letterSpacing:1}}>SYNDICATE ROUTES</h3>
+                {(data.routes||[]).length===0 && <p style={{color:'#444',fontSize:13,marginBottom:24}}>No routes seeded. Click "Seed Syndicate" to initialise the network.</p>}
+                {(data.routes||[]).length>0 && (
+                  <table style={{width:'100%',borderCollapse:'collapse',marginBottom:32}}>
+                    <thead><tr>{['From','','To','Type','Direction','Status','Action'].map(h=>(
+                      <th key={h} style={{textAlign:'left',padding:'8px 10px',color:'#444',fontSize:11,borderBottom:'1px solid #1a1a1a'}}>{h}</th>
+                    ))}</tr></thead>
+                    <tbody>{(data.routes||[]).map((r:any)=>(
+                      <tr key={r.id} style={{borderBottom:'1px solid #0d0d0d'}}>
+                        <td style={{padding:'8px 10px',fontSize:13,color:'#06b6d4',fontWeight:600}}>{r.from_agent}</td>
+                        <td style={{padding:'8px 10px',fontSize:13,color:'#444'}}>{r.bidirectional?'↔':'→'}</td>
+                        <td style={{padding:'8px 10px',fontSize:13,color:'#06b6d4',fontWeight:600}}>{r.to_agent}</td>
+                        <td style={{padding:'8px 10px'}}><span style={{background:'#0e4a5e',color:'#67e8f9',padding:'2px 7px',borderRadius:4,fontSize:11}}>{r.route_type}</span></td>
+                        <td style={{padding:'8px 10px',fontSize:12,color:'#555'}}>{r.bidirectional?'bidirectional':'one-way'}</td>
+                        <td style={{padding:'8px 10px'}}>
+                          <span style={{background:r.active?'#064e3b':'#1a1a1a',color:r.active?'#34d399':'#666',padding:'2px 7px',borderRadius:4,fontSize:11}}>{r.active?'active':'inactive'}</span>
+                        </td>
+                        <td style={{padding:'8px 10px'}}>
+                          <button onClick={async()=>{
+                            await fetch('/api/syndicate/routes',{method:'PATCH',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({id:r.id,active:!r.active})})
+                            loadSection('syndicate')
+                          }} style={{background:'transparent',color:r.active?'#ef4444':'#34d399',border:`1px solid ${r.active?'#7f1d1d':'#065f46'}`,borderRadius:5,padding:'3px 10px',fontSize:11,cursor:'pointer'}}>
+                            {r.active?'Disable':'Enable'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+
+                {/* Live Message Feed */}
+                <h3 style={{color:'#888',fontSize:13,marginBottom:12,letterSpacing:1}}>LIVE TRAFFIC</h3>
+                {(data.messages||[]).length===0 && <p style={{color:'#444',fontSize:13}}>No messages yet. Deploy agents and start conversations to see Syndicate traffic.</p>}
+                {(data.messages||[]).slice(0,30).map((m:any)=>(
+                  <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',borderBottom:'1px solid #0d0d0d',fontSize:12}}>
+                    <span style={{color:'#444',width:80,flexShrink:0}}>{new Date(m.created_at).toLocaleTimeString()}</span>
+                    <span style={{color:'#06b6d4',fontWeight:600,width:90,flexShrink:0}}>{m.from_agent}</span>
+                    <span style={{color:'#444'}}>──►</span>
+                    <span style={{color:'#06b6d4',fontWeight:600,width:90,flexShrink:0}}>{m.to_agent}</span>
+                    <span style={{background:'#1a1a1a',color:'#888',padding:'1px 6px',borderRadius:3,fontSize:11,flexShrink:0}}>{m.message_type}</span>
+                    <span style={{color:m.status==='completed'?'#34d399':m.status==='blocked'?'#ef4444':'#f59e0b',flexShrink:0}}>{m.status}</span>
+                    {m.quality_score && <span style={{color:'#555',fontSize:11}}>Q:{m.quality_score}</span>}
+                    {m.flagged_by_guardian && <span style={{color:'#ef4444',fontSize:11}}>FLAGGED</span>}
+                    {m.duration_ms && <span style={{color:'#444',fontSize:11,marginLeft:'auto'}}>{m.duration_ms}ms</span>}
+                  </div>
+                ))}
+              </div>
+            )}
             {section === 'payments' && (
               <div>
                 <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,marginBottom:24,letterSpacing:1}}>PAYMENTS</h2>
@@ -573,7 +655,7 @@ export default function MasterPanel() {
             </div>
             {/* Entity selector */}
             <div style={{padding:'12px 20px',borderBottom:'1px solid #111',display:'flex',gap:8}}>
-              {(['orion','forge','nexus'] as ChatEntity[]).map(e=>(
+              {(['orion','forge','nexus','syndicate'] as ChatEntity[]).map(e=>(
                 <button key={e} onClick={()=>{setChatEntity(e);setChatHistory([])}}
                   style={{flex:1,background:chatEntity===e?`${entityColors[e]}15`:'transparent',border:`1px solid ${chatEntity===e?entityColors[e]:'#222'}`,borderRadius:8,padding:'6px 8px',color:chatEntity===e?entityColors[e]:'#555',fontSize:11,fontWeight:700,cursor:'pointer',letterSpacing:1}}>
                   {e.toUpperCase()}

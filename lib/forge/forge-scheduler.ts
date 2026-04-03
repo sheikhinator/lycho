@@ -47,13 +47,25 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  // Get Orion brief to guide generation
+  // Request Orion brief via Syndicate
   let orionBrief = ''
   try {
-    orionBrief = await generateForgeBrief()
-    console.log('Orion brief generated for Forge')
+    const { transmit } = await import('@/lib/syndicate/syndicate')
+    const briefResult = await transmit({
+      from_agent: 'forge',
+      to_agent: 'orion',
+      message_type: 'forge_brief',
+      payload: { request: 'Strategic brief for agent generation' }
+    })
+    if (briefResult.success && typeof briefResult.response === 'object' && briefResult.response !== null) {
+      const r = briefResult.response as Record<string, unknown>
+      orionBrief = typeof r.brief === 'string' ? r.brief : ''
+    }
+    if (!orionBrief) orionBrief = await generateForgeBrief()
+    console.log('[SYNDICATE] Forge received Orion brief:', orionBrief.substring(0, 100))
   } catch(e) {
     console.error('Orion brief failed (non-critical):', e)
+    try { orionBrief = await generateForgeBrief() } catch { /* ignore */ }
   }
 
   const response = await anthropic.messages.create({
@@ -125,6 +137,19 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
   }
 
   console.log('=== FORGE DONE === Inserted:', inserted)
+
+  // Notify Orion via Syndicate
+  if (inserted > 0) {
+    try {
+      const { transmit } = await import('@/lib/syndicate/syndicate')
+      await transmit({
+        from_agent: 'forge',
+        to_agent: 'orion',
+        message_type: 'share_intelligence',
+        payload: { agents_built: inserted, message: `Forge completed. Built ${inserted} new agents.` }
+      })
+    } catch { /* non-critical */ }
+  }
 
   if (inserted > 0 && process.env.MASTER_EMAIL && process.env.RESEND_API_KEY) {
     new Resend(process.env.RESEND_API_KEY).emails.send({

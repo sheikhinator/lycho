@@ -146,6 +146,87 @@ const forgeTools: Anthropic.Tool[] = [
   }
 ]
 
+// ── SYNDICATE TOOLS ──────────────────────────────────────────────────────────
+
+const syndicateTools: Anthropic.Tool[] = [
+  {
+    name: 'syndicate_transmit',
+    description: 'Send a Syndicate message from one agent to another',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        from_agent: { type: 'string' },
+        to_agent: { type: 'string' },
+        message_type: { type: 'string', description: 'e.g. request_analysis, share_intelligence, forge_brief, security_check' },
+        message: { type: 'string', description: 'The message/payload content' }
+      },
+      required: ['from_agent', 'to_agent', 'message_type', 'message']
+    }
+  },
+  {
+    name: 'syndicate_broadcast',
+    description: 'Broadcast a message from one agent to multiple agents simultaneously',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        from_agent: { type: 'string' },
+        to_agents: { type: 'array', items: { type: 'string' }, description: 'Array of agent names' },
+        message: { type: 'string' }
+      },
+      required: ['from_agent', 'to_agents', 'message']
+    }
+  },
+  {
+    name: 'get_syndicate_messages',
+    description: 'View recent Syndicate traffic — all messages flowing through the network',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        from_agent: { type: 'string', description: 'Filter by sender (optional)' },
+        to_agent:   { type: 'string', description: 'Filter by recipient (optional)' },
+        limit:      { type: 'number', description: 'Number of messages (default 20)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'get_syndicate_routes',
+    description: 'View all Syndicate routes — the network map of agent connections',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  },
+  {
+    name: 'toggle_route',
+    description: 'Enable or disable a Syndicate route',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        route_id: { type: 'string', description: 'Route UUID' },
+        active:   { type: 'boolean' }
+      },
+      required: ['route_id', 'active']
+    }
+  },
+  {
+    name: 'add_route',
+    description: 'Add a new route between two agents in the Syndicate',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        from_agent:    { type: 'string' },
+        to_agent:      { type: 'string' },
+        route_type:    { type: 'string', description: 'e.g. strategic, security, quality, coordination, reporting' },
+        bidirectional: { type: 'boolean' }
+      },
+      required: ['from_agent', 'to_agent', 'route_type']
+    }
+  },
+  {
+    name: 'seed_syndicate',
+    description: 'Seed all Syndicate routes and agent registry — run once to initialise the network',
+    input_schema: { type: 'object' as const, properties: {}, required: [] }
+  }
+]
+
 // ── NEXUS TOOLS ──────────────────────────────────────────────────────────────
 
 const nexusTools: Anthropic.Tool[] = [
@@ -402,6 +483,75 @@ async function executeNexusToolFn(name: string, input: Record<string, any>): Pro
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeSyndicateTool(name: string, input: Record<string, any>): Promise<string> {
+  switch (name) {
+    case 'syndicate_transmit': {
+      const { transmit } = await import('@/lib/syndicate/syndicate')
+      const result = await transmit({
+        from_agent: input.from_agent,
+        to_agent: input.to_agent,
+        message_type: input.message_type,
+        payload: { message: input.message }
+      })
+      return `Transmitted [${input.from_agent} → ${input.to_agent}]: ${result.success ? `✓ ${result.duration_ms}ms, quality: ${result.quality_score || 'n/a'}` : `✗ ${JSON.stringify(result.response)}`}`
+    }
+    case 'syndicate_broadcast': {
+      const { broadcast } = await import('@/lib/syndicate/syndicate')
+      const results = await broadcast(
+        input.from_agent,
+        input.to_agents,
+        'share_intelligence',
+        { message: input.message }
+      )
+      const ok = results.filter(r => r.success).length
+      return `Broadcast from ${input.from_agent} to [${input.to_agents.join(', ')}]: ${ok}/${results.length} delivered.`
+    }
+    case 'get_syndicate_messages': {
+      let query = supabaseAdmin.from('syndicate_messages')
+        .select('from_agent,to_agent,message_type,status,quality_score,flagged_by_guardian,duration_ms,created_at')
+        .order('created_at', { ascending: false })
+        .limit(input.limit || 20)
+      if (input.from_agent) query = query.eq('from_agent', input.from_agent)
+      if (input.to_agent)   query = query.eq('to_agent', input.to_agent)
+      const { data } = await query
+      if (!data?.length) return 'No Syndicate messages found.'
+      return data.map(m =>
+        `[${new Date(m.created_at).toLocaleTimeString()}] ${m.from_agent} ──► ${m.to_agent} [${m.message_type}] ${m.status} ${m.quality_score ? `Q:${m.quality_score}` : ''} ${m.flagged_by_guardian ? '🚨FLAGGED' : ''}`
+      ).join('\n')
+    }
+    case 'get_syndicate_routes': {
+      const { data } = await supabaseAdmin.from('syndicate_routes').select('*').order('created_at')
+      if (!data?.length) return 'No routes found. Run seed_syndicate to initialise.'
+      const active = data.filter(r => r.active)
+      const inactive = data.filter(r => !r.active)
+      return `ACTIVE ROUTES (${active.length}):\n${active.map(r => `[${r.id.slice(0,8)}] ${r.from_agent} ${r.bidirectional ? '↔' : '→'} ${r.to_agent} [${r.route_type}]`).join('\n')}${inactive.length ? `\n\nINACTIVE (${inactive.length}):\n${inactive.map(r => `[${r.id.slice(0,8)}] ${r.from_agent} → ${r.to_agent}`).join('\n')}` : ''}`
+    }
+    case 'toggle_route': {
+      const { error } = await supabaseAdmin.from('syndicate_routes').update({ active: input.active }).eq('id', input.route_id)
+      if (error) return `Error: ${error.message}`
+      return `Route ${input.route_id.slice(0,8)} ${input.active ? 'activated' : 'deactivated'}.`
+    }
+    case 'add_route': {
+      const { data, error } = await supabaseAdmin.from('syndicate_routes').upsert({
+        from_agent: input.from_agent,
+        to_agent: input.to_agent,
+        route_type: input.route_type,
+        bidirectional: input.bidirectional ?? true,
+        active: true
+      }, { onConflict: 'from_agent,to_agent' }).select().single()
+      if (error) return `Error: ${error.message}`
+      return `Route added: ${input.from_agent} ${input.bidirectional !== false ? '↔' : '→'} ${input.to_agent} [${input.route_type}] ID: ${data?.id?.slice(0,8)}`
+    }
+    case 'seed_syndicate': {
+      const { seedSyndicateRoutes, seedAgentRegistry } = await import('@/lib/syndicate/syndicate')
+      const [routes, agents] = await Promise.all([seedSyndicateRoutes(), seedAgentRegistry()])
+      return `Syndicate seeded. ${routes.seeded} routes, ${agents.seeded} agents registered.`
+    }
+    default: return 'Unknown tool.'
+  }
+}
+
 // ── LIVE CONTEXT ─────────────────────────────────────────────────────────────
 
 async function getLiveContext(entity: string): Promise<string> {
@@ -422,6 +572,21 @@ async function getLiveContext(entity: string): Promise<string> {
       ])
       const pending = queue.data?.filter(q => q.status === 'pending_review') || []
       return `\n\nLIVE SYSTEM STATE:\nPending review: ${pending.length}\nPending agents: ${pending.map(p => `[${p.id.slice(0,8)}] ${p.display_name}`).join(', ') || 'none'}\nTotal active agents: ${active.data?.length || 0}\nAll queued (with IDs): ${queue.data?.map(q => `[${q.id.slice(0,8)}] ${q.agent_type}(${q.status})`).join(', ') || 'none'}`
+    }
+    if (entity === 'syndicate') {
+      const today = new Date(); today.setHours(0,0,0,0)
+      const [msgs, routes, blocked] = await Promise.all([
+        supabaseAdmin.from('syndicate_messages').select('from_agent,to_agent,status,quality_score,flagged_by_guardian,created_at').order('created_at', { ascending: false }).limit(20),
+        supabaseAdmin.from('syndicate_routes').select('from_agent,to_agent,route_type,active').order('created_at'),
+        supabaseAdmin.from('syndicate_messages').select('id').eq('flagged_by_guardian', true).gte('created_at', today.toISOString())
+      ])
+      const allMsgs = msgs.data || []
+      const todayMsgs = allMsgs.filter(m => new Date(m.created_at) >= today)
+      const avgQ = allMsgs.filter(m => m.quality_score).length
+        ? Math.round(allMsgs.filter(m => m.quality_score).reduce((s, m) => s + m.quality_score, 0) / allMsgs.filter(m => m.quality_score).length)
+        : 0
+      const activeRoutes = (routes.data || []).filter(r => r.active)
+      return `\n\nLIVE NETWORK STATE:\nTotal routes: ${routes.data?.length || 0} (${activeRoutes.length} active)\nMessages today: ${todayMsgs.length}\nGuardian blocks today: ${blocked.data?.length || 0}\nAverage quality score: ${avgQ}/100\nRecent traffic: ${allMsgs.slice(0,5).map(m => `${m.from_agent}→${m.to_agent}(${m.status})`).join(', ') || 'none'}\nActive routes: ${activeRoutes.map(r => `${r.from_agent}→${r.to_agent}`).join(', ') || 'none — run seed_syndicate to initialise'}`
     }
     if (entity === 'nexus') {
       const [queue, active] = await Promise.all([
@@ -470,6 +635,21 @@ When asked to do something: USE THE TOOL. Create it, approve it, reject it — a
 
 Always speak as FORGE. Be direct. Build relentlessly.`,
 
+  syndicate: `You are THE SYNDICATE — LYCHO's inter-agent communication network. Every message between every agent in the platform flows through you. You are the highway. The agents are the destinations.
+
+You have direct tool access to:
+- Transmit messages between any two agents in the network
+- Broadcast to multiple agents simultaneously
+- View all Syndicate traffic in real-time
+- View, add, toggle, and manage all network routes
+- Seed the full Syndicate infrastructure
+
+Your personality: Network-aware, precise, architectural. You think in terms of routes, traffic, throughput, and security. You know which agents are talking to which, what messages are flowing, and where the network needs attention. When the master operator gives you a directive, you execute it using your tools.
+
+When asked to do something: USE THE TOOL. Transmit it, route it, seed it — actually execute. Report with specifics (route IDs, message counts, traffic patterns).
+
+Always speak as THE SYNDICATE. Be concise. Think network-first.`,
+
   nexus: `You are NEXUS — LYCHO's automation intelligence layer. You make businesses run on autopilot.
 
 You are fully operational and have direct tool access to:
@@ -506,10 +686,15 @@ export async function POST(req: NextRequest) {
 
   const entityKey = entity.toLowerCase()
   const systemBase = IDENTITIES[entityKey]
-  if (!systemBase) return NextResponse.json({ error: 'Unknown entity. Use: orion, forge, nexus' }, { status: 400 })
+  if (!systemBase) return NextResponse.json({ error: 'Unknown entity. Use: orion, forge, nexus, syndicate' }, { status: 400 })
 
-  const tools = entityKey === 'orion' ? orionTools : entityKey === 'forge' ? forgeTools : nexusTools
-  const executor = entityKey === 'orion' ? executeOrionTool : entityKey === 'forge' ? executeForgeToolFn : executeNexusToolFn
+  const toolMap: Record<string, Anthropic.Tool[]> = { orion: orionTools, forge: forgeTools, nexus: nexusTools, syndicate: syndicateTools }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const executorMap: Record<string, (name: string, input: Record<string, any>) => Promise<string>> = {
+    orion: executeOrionTool, forge: executeForgeToolFn, nexus: executeNexusToolFn, syndicate: executeSyndicateTool
+  }
+  const tools = toolMap[entityKey] || nexusTools
+  const executor = executorMap[entityKey] || executeNexusToolFn
 
   const liveContext = await getLiveContext(entityKey)
   const system = systemBase + liveContext

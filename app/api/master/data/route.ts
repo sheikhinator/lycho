@@ -87,5 +87,38 @@ export async function GET(request: Request) {
     })
   }
 
+  if (section === 'syndicate') {
+    const today = new Date(); today.setHours(0,0,0,0)
+    const [msgs, routes, registry] = await Promise.all([
+      supabase.from('syndicate_messages').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('syndicate_routes').select('*').order('created_at'),
+      supabase.from('agent_registry').select('*').order('category')
+    ])
+    const allMsgs = msgs.data || []
+    const todayMsgs = allMsgs.filter((m: Record<string, string>) => new Date(m.created_at) >= today)
+    const blocked = allMsgs.filter((m: Record<string, boolean>) => m.flagged_by_guardian)
+    const avgQ = allMsgs.filter((m: Record<string, number>) => m.quality_score).length
+      ? Math.round(allMsgs.filter((m: Record<string, number>) => m.quality_score).reduce((s: number, m: Record<string, number>) => s + m.quality_score, 0) / allMsgs.filter((m: Record<string, number>) => m.quality_score).length)
+      : 0
+    // Most active pair
+    const pairCounts: Record<string, number> = {}
+    allMsgs.forEach((m: Record<string, string>) => {
+      const key = `${m.from_agent} ↔ ${m.to_agent}`
+      pairCounts[key] = (pairCounts[key] || 0) + 1
+    })
+    const topPair = Object.entries(pairCounts).sort((a, b) => b[1] - a[1])[0]
+    return NextResponse.json({
+      messages: allMsgs,
+      routes: routes.data || [],
+      registry: registry.data || [],
+      messages_today: todayMsgs.length,
+      guardian_blocks: blocked.length,
+      avg_quality: avgQ,
+      active_routes: (routes.data || []).filter((r: Record<string, boolean>) => r.active).length,
+      total_routes: routes.data?.length || 0,
+      top_pair: topPair ? `${topPair[0]} (${topPair[1]} msgs)` : 'No traffic yet'
+    })
+  }
+
   return NextResponse.json({})
 }

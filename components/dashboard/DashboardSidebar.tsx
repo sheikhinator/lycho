@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, MessageSquare, Zap,
-  Store, CreditCard, Settings, Code2, Wand2, BarChart2,
+  Store, CreditCard, Settings, Code2, Wand2, BarChart2, Network,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { useSidebar } from '@/components/providers/SidebarContext'
@@ -15,6 +15,7 @@ const NAV = [
   { icon: Wand2,           label: 'Build Agent',   href: '/dashboard/agents/builder' },
   { icon: MessageSquare,   label: 'Conversations', href: '/dashboard/conversations' },
   { icon: Zap,             label: 'Nexus',         href: '/dashboard/nexus'         },
+  { icon: Network,         label: 'Syndicate',     href: '/dashboard/syndicate'     },
   { icon: BarChart2,       label: 'Analytics',     href: '/dashboard/analytics'     },
   { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'   },
   { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'       },

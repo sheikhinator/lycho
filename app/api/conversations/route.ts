@@ -13,6 +13,7 @@ import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 import { createNotification } from '@/lib/notifications/notification-service'
 import { injectIntelligence, scoreConversation } from '@/lib/orion/orion-engine'
 import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
+import { transmit } from '@/lib/syndicate/syndicate'
 
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
@@ -225,6 +226,23 @@ export async function POST(req: NextRequest) {
   )
   let model = getModel(promptModel)
 
+  // 5e. Guardian security check (non-blocking for normal traffic)
+  try {
+    const securityCheck = await transmit({
+      from_agent: agent.agent_type,
+      to_agent: 'guardian',
+      message_type: 'security_check',
+      payload: { message: body.message, tenant_id: tenantId },
+      priority: 'normal',
+      tenant_id: tenantId
+    })
+    if (securityCheck.response && typeof securityCheck.response === 'object' &&
+        'flagged' in (securityCheck.response as Record<string, unknown>) &&
+        (securityCheck.response as Record<string, unknown>).flagged) {
+      return ok({ response: "I'm unable to process that request. Please try rephrasing.", flagged: true })
+    }
+  } catch { /* non-critical — never block conversation on Syndicate failure */ }
+
   // 6. Check if Agent Council needed, else use Orion-injected prompt
   const complexity = detectComplexity(body.message)
   const maxTokens = promptModel === 'complex' ? 900 : 600
@@ -277,6 +295,37 @@ export async function POST(req: NextRequest) {
   // Reassign claudeResult for downstream use
   if (!claudeResult) {
     return err('AI service temporarily unavailable.', 'AI_ERROR', 503)
+  }
+
+  // 6b. Veritas quality check (non-blocking)
+  transmit({
+    from_agent: agent.agent_type,
+    to_agent: 'veritas',
+    message_type: 'quality_check',
+    payload: { response: claudeResult!.response },
+    tenant_id: tenantId
+  }).catch(() => null)
+
+  // 6c. Check for ESCALATE_TO: pattern in response
+  const escalationMatch = claudeResult!.response.match(/ESCALATE_TO:(\w+)/)
+  if (escalationMatch) {
+    const targetAgent = escalationMatch[1].toLowerCase()
+    try {
+      const specialistResult = await transmit({
+        from_agent: agent.agent_type,
+        to_agent: targetAgent,
+        message_type: 'request_analysis',
+        payload: { query: body.message, context: claudeResult!.response.replace(/ESCALATE_TO:\w+/, '').trim() },
+        tenant_id: tenantId,
+        conversation_id: conversation!.id as string
+      })
+      if (specialistResult.success && specialistResult.response && typeof specialistResult.response === 'object') {
+        const r = specialistResult.response as Record<string, unknown>
+        if (typeof r.response === 'string' && r.response) {
+          claudeResult!.response = `${claudeResult!.response.replace(/ESCALATE_TO:\w+/, '').trim()}\n\n${r.response}`
+        }
+      }
+    } catch { /* non-critical */ }
   }
 
   // 7. Extract metadata and clean response
