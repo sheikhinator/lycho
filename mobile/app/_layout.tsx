@@ -24,9 +24,13 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#070707' } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="signup" />
+      <Stack.Screen name="forgot-password" />
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="agents" />
+      <Stack.Screen name="agents/[id]" />
       <Stack.Screen name="conversations" />
+      <Stack.Screen name="conversations/[id]" />
       <Stack.Screen name="settings" />
     </Stack>
   )

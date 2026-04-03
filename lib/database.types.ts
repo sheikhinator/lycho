@@ -10,6 +10,7 @@ export type Database = {
           sector: string | null
           plan: string
           plan_status: string
+          slug: string | null
           trial_ends_at: string | null
           country: string
           currency: string
@@ -28,6 +29,7 @@ export type Database = {
           sector?: string | null
           plan?: string
           plan_status?: string
+          slug?: string | null
           trial_ends_at?: string | null
           country?: string
           currency?: string

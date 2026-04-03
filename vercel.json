@@ -2,6 +2,7 @@
   "crons": [
     {"path": "/api/forge/autonomous", "schedule": "0 22 * * *"},
     {"path": "/api/orion/optimise", "schedule": "0 21 * * *"},
-    {"path": "/api/nexus/scheduled", "schedule": "0 23 * * *"}
+    {"path": "/api/nexus/scheduled", "schedule": "0 23 * * *"},
+    {"path": "/api/cron/expire-trials", "schedule": "0 0 * * *"}
   ]
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { View, Text, FlatList, StyleSheet } from 'react-native'
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
+import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 
 const GOLD = '#C9A84C'
@@ -13,12 +14,20 @@ interface Convo { id: string; contact_identifier: string; channel: string; statu
 
 export default function ConversationsScreen() {
   const [convos, setConvos] = useState<Convo[]>([])
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    supabase.from('conversations').select('id, contact_identifier, channel, status, created_at, metadata').order('created_at', { ascending: false }).limit(50).then(({ data }) => {
-      if (data) setConvos(data as Convo[])
-    })
-  }, [])
+  async function loadConvos() {
+    setRefreshing(true)
+    const { data } = await supabase
+      .from('conversations')
+      .select('id, contact_identifier, channel, status, created_at, metadata')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (data) setConvos(data as Convo[])
+    setRefreshing(false)
+  }
+
+  useEffect(() => { loadConvos() }, [])
 
   return (
     <View style={styles.container}>
@@ -27,18 +36,20 @@ export default function ConversationsScreen() {
         data={convos}
         keyExtractor={c => c.id}
         contentContainerStyle={{ padding: 20 }}
+        refreshing={refreshing}
+        onRefresh={loadConvos}
         ListEmptyComponent={<Text style={styles.empty}>No conversations yet</Text>}
         renderItem={({ item: c }) => {
           const score = (c.metadata?.lead_score as number) ?? 0
           return (
-            <View style={styles.card}>
+            <TouchableOpacity style={styles.card} onPress={() => router.push(`/conversations/${c.id}` as never)}>
               <View style={styles.row}>
                 <Text style={styles.contact}>{c.contact_identifier}</Text>
                 {score >= 85 && <Text style={styles.hot}>🔥 Hot</Text>}
               </View>
               <Text style={styles.meta}>{c.channel} · {c.status} · {new Date(c.created_at).toLocaleDateString()}</Text>
               <Text style={styles.score}>Lead score: {score}/100</Text>
-            </View>
+            </TouchableOpacity>
           )
         }}
       />

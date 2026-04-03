@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, FileText, Download, ChevronRight } from 'lucide-react'
 import { useToast } from '@/components/providers/ToastProvider'
+import { createClientSupabase } from '@/lib/supabase'
 
 async function postCheckout(plan: string, billing_cycle: string): Promise<{ mock?: boolean; checkout_url?: string; message?: string } | null> {
   try {
@@ -118,8 +119,48 @@ export default function BillingPage() {
   const [annual, setAnnual] = useState(false)
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const { toast } = useToast()
-  const currentPlan = 'starter'
+  const [currentPlan, setCurrentPlan] = useState('starter')
+  const [invoices, setInvoices] = useState<{ id: string; date: string; amount: string; status: string }[]>([])
+  const [loading, setLoading] = useState(true)
   const billing_cycle = annual ? 'annual' : 'monthly'
+
+  useEffect(() => {
+    loadBillingData()
+  }, [])
+
+  async function loadBillingData() {
+    try {
+      const sb = createClientSupabase()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+
+      const { data: userRow } = await sb.from('users').select('tenant_id').eq('id', user.id).single()
+      if (!userRow?.tenant_id) return
+
+      const { data: tenant } = await sb.from('tenants').select('plan_status').eq('id', userRow.tenant_id).single()
+      if (tenant?.plan_status) setCurrentPlan(tenant.plan_status === 'trialing' ? 'starter' : tenant.plan_status)
+
+      const { data: subs } = await sb
+        .from('subscriptions')
+        .select('amount_pkr, currency, current_period_end, payment_provider')
+        .eq('tenant_id', userRow.tenant_id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (subs && subs.length > 0) {
+        setInvoices(subs.map((s, i) => ({
+          id: `INV-${new Date().getFullYear()}-${String(subs.length - i).padStart(3, '0')}`,
+          date: new Date(s.current_period_end ?? '').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          amount: `${s.currency ?? 'PKR'} ${(s.amount_pkr ?? 0).toLocaleString('en-PK')}`,
+          status: s.payment_provider ? 'Paid' : 'Pending',
+        })))
+      }
+    } catch {
+      // fall back to empty state
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleUpgrade(planId: string) {
     if (planId === currentPlan || planId === 'enterprise') return
@@ -313,10 +354,14 @@ export default function BillingPage() {
               </tr>
             </thead>
             <tbody>
-              {INVOICES.map((inv, i) => (
+              {loading ? (
+                <tr><td colSpan={5} className="px-5 py-4 text-center" style={{ color: '#6b6b6b' }}>Loading…</td></tr>
+              ) : invoices.length === 0 ? (
+                <tr><td colSpan={5} className="px-5 py-4 text-center" style={{ color: '#6b6b6b' }}>No invoices yet</td></tr>
+              ) : invoices.map((inv, i) => (
                 <tr
                   key={inv.id}
-                  style={{ borderBottom: i < INVOICES.length - 1 ? '1px solid #2a2a2a' : 'none' }}
+                  style={{ borderBottom: i < invoices.length - 1 ? '1px solid #2a2a2a' : 'none' }}
                 >
                   <td className="px-5 py-4 font-sans" style={{ color: '#F0EBE1' }}>
                     <div className="flex items-center gap-2">
