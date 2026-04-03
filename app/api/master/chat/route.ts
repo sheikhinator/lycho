@@ -14,6 +14,7 @@ const supabaseAdmin = createClient(
 
 // ── ORION TOOLS ──────────────────────────────────────────────────────────────
 
+// ORION TOOLS
 const orionTools: Anthropic.Tool[] = [
   {
     name: 'run_optimisation',
@@ -281,6 +282,34 @@ const syndicateTools: Anthropic.Tool[] = [
     input_schema: { type: 'object' as const, properties: {}, required: [] }
   }
 ]
+
+// ── ORION UNRESTRICTED TOOLS ─────────────────────────────────────────────────
+const ORION_UNRESTRICTED_TOOLS: Anthropic.Tool[] = [
+  { name: 'fix_all_agents', description: 'Fix all agents — rewrites underperforming prompts, re-initializes broken ones', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'get_all_agents', description: 'Get all agents across all tenants with status and performance', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'update_agent_prompt', description: 'Update any agent system prompt in real time', input_schema: {
+      type: 'object' as const,
+      properties: {
+        agent_type: { type: 'string' },
+        new_prompt: { type: 'string' },
+        reason: { type: 'string' }
+      },
+      required: ['agent_type','new_prompt']
+    } },
+  { name: 'update_marketplace_agent', description: 'Update marketplace agent prompt and metadata', input_schema: { type: 'object' as const, properties: { agent_type: { type: 'string' }, updates: { type: 'object' } }, required: ['agent_type','updates'] } },
+  { name: 'deploy_agent_to_tenant', description: 'Deploy any agent to any tenant', input_schema: { type: 'object' as const, properties: { tenant_id: { type: 'string' }, agent_type: { type: 'string' } }, required: ['tenant_id','agent_type'] } },
+  { name: 'fix_agent_by_type', description: 'Fix a specific agent type across the platform', input_schema: { type: 'object' as const, properties: { agent_type: { type: 'string' } }, required: ['agent_type'] } },
+  { name: 'get_all_tenants', description: 'Get all tenants with full details', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'get_platform_errors', description: 'Get recent errors from Vercel logs and Sentry', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'fix_notifications', description: 'Fix notifications table and API', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'run_database_health_check', description: 'Check all tables exist with correct columns', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+  { name: 'fix_missing_columns', description: 'Add any missing database columns', input_schema: { type: 'object' as const, properties: {}, required: [] } }
+]
+
+// Merge unrestricted tools into the Orion toolset
+orionTools.push(...ORION_UNRESTRICTED_TOOLS)
+
+// ── ORION SYSTEM PROMPT ─────────────────────────────────────────────────────
 
 // ── NEXUS TOOLS ──────────────────────────────────────────────────────────────
 
