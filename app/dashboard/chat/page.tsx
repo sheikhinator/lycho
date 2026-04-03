@@ -34,7 +34,7 @@ export default function ChatPage() {
     if (!selectedAgent) return
     fetch(`/api/conversations?agent_id=${selectedAgent.id}`)
       .then(r => r.json())
-      .then(j => setConversations(j.data ?? []))
+      .then(j => setConversations(j.data?.conversations ?? j.data ?? []))
       .catch(() => {})
   }, [selectedAgent])
 
