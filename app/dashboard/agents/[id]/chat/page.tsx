@@ -84,30 +84,36 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
     setMessages(prev => [...prev, userMsg])
 
     try {
-      const form = new FormData()
-      form.append('message', text)
-      // History without files (just text for context)
-      const historyForAPI = messages.slice(-12).map(m => ({ role: m.role, content: m.content }))
-      form.append('history', JSON.stringify(historyForAPI))
-      attachedFiles.forEach(af => form.append('file', af.file, af.file.name))
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: agentId,
+          message: text,
+          channel: 'web',
+          contact_identifier: 'dashboard-user'
+        })
+      })
 
-      const res = await fetch(`/api/agents/${agentId}/chat`, { method: 'POST', body: form })
-      const json = await res.json()
+      // Robust handling: try to parse JSON, but fall back gracefully if response isn't JSON
+      let json: any = {}
+      try { json = await res.json() } catch {
+        json = {}
+      }
 
-      if (res.status === 402) { setPlanError(true); setSending(false); return }
-      if (res.status === 404 || res.status === 400) { setAgentError(true); setSending(false); return }
-
+      // Non-OK handling with minimal UX disruption
       if (!res.ok) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${json.error ?? 'Something went wrong'}` }])
+        const agentResponse = json?.data?.response ?? json?.response ?? json?.message ?? 'No response received'
+        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${agentResponse}` }])
       } else {
-        if (json.data?.agent_name) setAgentName(json.data.agent_name)
-        setMessages(prev => [...prev, { role: 'assistant', content: json.data.response }])
+        const agentResponse = json?.data?.response ?? json?.response ?? json?.message ?? 'No response received'
+        setMessages(prev => [...prev, { role: 'assistant', content: agentResponse }])
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Network error — please try again.' }])
     }
     setSending(false)
-  }, [sending, input, files, messages, agentId])
+  }, [sending, input, files, agentId])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
