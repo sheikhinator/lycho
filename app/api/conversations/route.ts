@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { canReceiveMessage } from '@/lib/plan-limits'
 import { sanitiseInput } from '@/lib/sanitise'
-import { callClaude, getModel } from '@/lib/claude'
+import { getModel } from '@/lib/claude'
 import { getSystemPrompt, COMPLEX_CORE } from '@/lib/agents/get-system-prompt'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
@@ -14,6 +15,9 @@ import { createNotification } from '@/lib/notifications/notification-service'
 import { injectIntelligence, scoreConversation } from '@/lib/orion/orion-engine'
 import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
 import { transmit } from '@/lib/syndicate/syndicate'
+import { searchKnowledge } from '@/lib/knowledge/knowledge-engine'
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
@@ -59,7 +63,7 @@ export async function GET(req: NextRequest) {
   return ok({ conversations: data, total: count ?? 0, page, limit })
 }
 
-// POST /api/conversations — send a message, get Claude response
+// POST /api/conversations — send a message, stream Claude response via SSE
 export async function POST(req: NextRequest) {
   const rl = await rateGuard(req)
   if (rl) return rl
@@ -224,9 +228,9 @@ export async function POST(req: NextRequest) {
     agent,
     hasProfile ? existingProfile : null,
   )
-  let model = getModel(promptModel)
+  const model = getModel(promptModel)
 
-  // 5e. Guardian security check (non-blocking for normal traffic)
+  // 5e. Guardian security check (non-blocking)
   try {
     const securityCheck = await transmit({
       from_agent: agent.agent_type,
@@ -241,313 +245,294 @@ export async function POST(req: NextRequest) {
         (securityCheck.response as Record<string, unknown>).flagged) {
       return ok({ response: "I'm unable to process that request. Please try rephrasing.", flagged: true })
     }
-  } catch { /* non-critical — never block conversation on Syndicate failure */ }
+  } catch { /* non-critical */ }
 
-  // 6. Check if Agent Council needed, else use Orion-injected prompt
-  const complexity = detectComplexity(body.message)
-  const maxTokens = promptModel === 'complex' ? 900 : 600
-  let claudeResult
-  let agentResponse: string
-  let modelUsed: string
+  // 6. Streaming setup
+  const complexity  = detectComplexity(body.message)
+  const maxTokens   = promptModel === 'complex' ? 900 : 600
+  const encoder     = new TextEncoder()
+  let agentResponse = ''
+  let modelUsed     = ''
 
-  if (complexity.needsCouncil && complexity.suggestedAgents.length > 1) {
-    try {
-      const council = await conveneCouncil(
-        tenantId,
-        (conversation!.id as string),
-        body.message,
-        complexity.suggestedAgents,
-        countryCode,
-        priorMessages
-      )
-      agentResponse = council.response
-      modelUsed = 'orion-council'
-      claudeResult = { response: agentResponse, tokensUsed: 0, model: modelUsed, estimatedCostPkr: 0 }
-    } catch {
-      // Fallback to single agent
-      complexity.needsCouncil = false
-    }
-  }
+  const readable = new ReadableStream({
+    async start(controller) {
+      const enqueue = (text: string) => controller.enqueue(encoder.encode(text))
 
-  if (!complexity.needsCouncil || complexity.suggestedAgents.length <= 1) {
-    // Get Orion-optimised prompt (falls back to base prompt if Orion unavailable)
-    let orionPrompt = basePrompt
-    try {
-      orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt)
-    } catch { /* non-critical */ }
-
-    const systemPrompt = extraContext ? `${orionPrompt}\n\n${extraContext}` : orionPrompt
-    try {
-      claudeResult = await callClaude({
-        systemPrompt,
-        messages,
-        model,
-        maxTokens,
-        useCache: true,
-      })
-    } catch (e) {
-      return err('AI service temporarily unavailable. Please try again.', 'AI_ERROR', 503)
-    }
-    agentResponse = claudeResult!.response
-    modelUsed = claudeResult!.model
-  }
-
-  // Reassign claudeResult for downstream use
-  if (!claudeResult) {
-    return err('AI service temporarily unavailable.', 'AI_ERROR', 503)
-  }
-
-  // 6b. Veritas quality check (non-blocking)
-  transmit({
-    from_agent: agent.agent_type,
-    to_agent: 'veritas',
-    message_type: 'quality_check',
-    payload: { response: claudeResult!.response },
-    tenant_id: tenantId
-  }).catch(() => null)
-
-  // 6c. Check for ESCALATE_TO: pattern in response
-  const escalationMatch = claudeResult!.response.match(/ESCALATE_TO:(\w+)/)
-  if (escalationMatch) {
-    const targetAgent = escalationMatch[1].toLowerCase()
-    try {
-      const specialistResult = await transmit({
-        from_agent: agent.agent_type,
-        to_agent: targetAgent,
-        message_type: 'request_analysis',
-        payload: { query: body.message, context: claudeResult!.response.replace(/ESCALATE_TO:\w+/, '').trim() },
-        tenant_id: tenantId,
-        conversation_id: conversation!.id as string
-      })
-      if (specialistResult.success && specialistResult.response && typeof specialistResult.response === 'object') {
-        const r = specialistResult.response as Record<string, unknown>
-        if (typeof r.response === 'string' && r.response) {
-          claudeResult!.response = `${claudeResult!.response.replace(/ESCALATE_TO:\w+/, '').trim()}\n\n${r.response}`
+      try {
+        // 6a. Agent Council path
+        if (complexity.needsCouncil && complexity.suggestedAgents.length > 1) {
+          try {
+            const council = await conveneCouncil(
+              tenantId,
+              (conversation!.id as string),
+              body.message,
+              complexity.suggestedAgents,
+              countryCode,
+              priorMessages
+            )
+            agentResponse = council.response
+            modelUsed = 'orion-council'
+            enqueue(`data: ${JSON.stringify({ text: agentResponse })}\n\n`)
+          } catch {
+            complexity.needsCouncil = false
+          }
         }
+
+        // 6b. Normal streaming path
+        if (!complexity.needsCouncil || complexity.suggestedAgents.length <= 1) {
+          let orionPrompt = basePrompt
+          try { orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt) } catch {}
+
+          // RAG: inject knowledge context
+          let knowledgeContext = ''
+          try { knowledgeContext = await searchKnowledge(tenantId, body.message) } catch {}
+
+          const enrichedPrompt = knowledgeContext
+            ? `${orionPrompt}\n\nRELEVANT KNOWLEDGE FROM CLIENT'S KNOWLEDGE BASE:\n${knowledgeContext}\n\nUse this knowledge when relevant. Always prioritise it over general knowledge.`
+            : orionPrompt
+          const systemPrompt = extraContext ? `${enrichedPrompt}\n\n${extraContext}` : enrichedPrompt
+
+          const stream = anthropic.messages.stream({
+            model,
+            max_tokens: maxTokens,
+            system: systemPrompt,
+            messages: messages.slice(-20),
+          })
+
+          const chunks: string[] = []
+          for await (const chunk of stream) {
+            if (chunk.type === 'content_block_delta') {
+              const delta = chunk.delta
+              if (delta.type === 'text_delta') {
+                chunks.push(delta.text)
+                enqueue(`data: ${JSON.stringify({ text: delta.text })}\n\n`)
+              }
+            }
+          }
+          agentResponse = chunks.join('')
+          modelUsed = model
+        }
+      } catch {
+        enqueue(`data: ${JSON.stringify({ text: 'Error — please try again' })}\n\n`)
+        enqueue('data: [DONE]\n\n')
+        controller.close()
+        return
       }
-    } catch { /* non-critical */ }
-  }
 
-  // 7. Extract metadata and clean response
-  const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(claudeResult!.response)
+      enqueue('data: [DONE]\n\n')
+      controller.close()
 
-  // 7b. Update contact memory graph (non-fatal)
-  await updateContactMemory(
-    tenantId,
-    body.contact_identifier,
-    {
-      profile:         metadata?.profile_update ?? {},
-      total_value_pkr: metadata?.transaction_value ?? 0,
-    },
-    {
-      timestamp:  new Date().toISOString(),
-      type:       'interaction',
-      summary:    body.message.slice(0, 120),
-      sentiment:  metadata?.sentiment ?? emotion.state,
-      agent_type: agent.agent_type,
-      channel:    body.channel,
-    },
-    supabase,
-  )
+      if (!agentResponse) return
 
-  // 8. Update contact profile
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currentProfile = (conversation!.metadata as any)?.contact_profile || {}
-  const updatedProfile = { ...currentProfile, ...(metadata?.profile_update || {}) }
+      // ── Background post-processing (fire-and-forget) ───────────────────────
+      void (async () => {
+        try {
+          // Veritas quality check
+          transmit({
+            from_agent: agent.agent_type,
+            to_agent: 'veritas',
+            message_type: 'quality_check',
+            payload: { response: agentResponse },
+            tenant_id: tenantId
+          }).catch(() => null)
 
-  // 9. Calculate lead score
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const leadScore = calculateLeadScore(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (conversation!.metadata as any)?.lead_score || 50,
-    metadata,
-    messages.length,
-  )
+          // Check for ESCALATE_TO: pattern
+          let finalResponse = agentResponse
+          const escalationMatch = agentResponse.match(/ESCALATE_TO:(\w+)/)
+          if (escalationMatch) {
+            const targetAgent = escalationMatch[1].toLowerCase()
+            try {
+              const specialistResult = await transmit({
+                from_agent: agent.agent_type,
+                to_agent: targetAgent,
+                message_type: 'request_analysis',
+                payload: { query: body.message, context: agentResponse.replace(/ESCALATE_TO:\w+/, '').trim() },
+                tenant_id: tenantId,
+                conversation_id: conversation!.id as string
+              })
+              if (specialistResult.success && specialistResult.response && typeof specialistResult.response === 'object') {
+                const r = specialistResult.response as Record<string, unknown>
+                if (typeof r.response === 'string' && r.response) {
+                  finalResponse = `${agentResponse.replace(/ESCALATE_TO:\w+/, '').trim()}\n\n${r.response}`
+                }
+              }
+            } catch {}
+          }
 
-  // 10. Calculate confidence
-  const confidence = calculateConfidence(cleanResponse, body.message)
+          const { cleanResponse, metadata, escalated } = extractProfileFromMetadata(finalResponse)
 
-  // 11. Update conversation in DB
-  const updatedMessages = [
-    ...messages,
-    { role: 'assistant' as const, content: cleanResponse, timestamp: new Date().toISOString() },
-  ]
+          await updateContactMemory(
+            tenantId,
+            body.contact_identifier,
+            {
+              profile:         metadata?.profile_update ?? {},
+              total_value_pkr: metadata?.transaction_value ?? 0,
+            },
+            {
+              timestamp:  new Date().toISOString(),
+              type:       'interaction',
+              summary:    body.message.slice(0, 120),
+              sentiment:  metadata?.sentiment ?? emotion.state,
+              agent_type: agent.agent_type,
+              channel:    body.channel,
+            },
+            supabase,
+          )
 
-  await supabase
-    .from('conversations')
-    .update({
-      messages: updatedMessages,
-      confidence_score: confidence,
-      escalated_to: escalated ? 'human' : null,
-      status: escalated ? 'escalated' : 'open',
-      tokens_used: ((conversation!.tokens_used as number) || 0) + claudeResult!.tokensUsed,
-      metadata: {
-        contact_profile:       updatedProfile,
-        lead_score:            leadScore,
-        lead_label:            getLeadLabel(leadScore),
-        sentiment:             metadata?.sentiment || 'neutral',
-        emotional_state:       emotion.state,
-        emotional_intensity:   emotion.intensity,
-        intent:                metadata?.intent || 'enquiry',
-        suggested_next_action: metadata?.suggested_next_action || 'continue',
-        last_metadata:         metadata,
-      },
-    })
-    .eq('id', conversation!.id as string)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const currentProfile = (conversation!.metadata as any)?.contact_profile || {}
+          const updatedProfile = { ...currentProfile, ...(metadata?.profile_update || {}) }
 
-  // 12. Update agent interaction count
-  await supabase
-    .from('agents')
-    .update({
-      interactions_count: ((agent.interactions_count as number) || 0) + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', body.agent_id)
+          const leadScore = calculateLeadScore(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (conversation!.metadata as any)?.lead_score || 50,
+            metadata,
+            messages.length,
+          )
 
-  // 13. Hot lead audit log + email alert
-  const previousLeadScore = (conversation!.metadata as Record<string, unknown>)?.lead_score as number | undefined ?? 50
-  const isNewHotLead = leadScore >= 85 && previousLeadScore < 85
+          const confidence = calculateConfidence(cleanResponse, body.message)
 
-  if (leadScore >= 85) {
-    await auditLog(supabase, {
-      tenantId,
-      actorId: userId,
-      action: 'lead.hot_detected',
-      resourceType: 'conversation',
-      resourceId: conversation!.id as string,
-      metadata: { lead_score: leadScore, contact_profile: updatedProfile },
-    })
-  }
+          const updatedMessages = [
+            ...messages,
+            { role: 'assistant' as const, content: cleanResponse, timestamp: new Date().toISOString() },
+          ]
 
-  const ownerEmail = tenant.business_email as string | undefined
+          await supabase
+            .from('conversations')
+            .update({
+              messages: updatedMessages,
+              confidence_score: confidence,
+              escalated_to: escalated ? 'human' : null,
+              status: escalated ? 'escalated' : 'open',
+              tokens_used: ((conversation!.tokens_used as number) || 0),
+              metadata: {
+                contact_profile:       updatedProfile,
+                lead_score:            leadScore,
+                lead_label:            getLeadLabel(leadScore),
+                sentiment:             metadata?.sentiment || 'neutral',
+                emotional_state:       emotion.state,
+                emotional_intensity:   emotion.intensity,
+                intent:                metadata?.intent || 'enquiry',
+                suggested_next_action: metadata?.suggested_next_action || 'continue',
+                last_metadata:         metadata,
+              },
+            })
+            .eq('id', conversation!.id as string)
 
-  if (isNewHotLead) {
-    void createNotification(
-      tenantId,
-      'hot_lead',
-      '🔥 Hot Lead',
-      `Contact scored ${leadScore}/100`,
-      '/dashboard/conversations',
-      supabase,
-    )
-  }
+          await supabase
+            .from('agents')
+            .update({
+              interactions_count: ((agent.interactions_count as number) || 0) + 1,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', body.agent_id)
 
-  if (escalated && conversation!.status !== 'escalated') {
-    void createNotification(
-      tenantId,
-      'escalation',
-      '⚡ Escalation',
-      `${body.contact_identifier} needs attention`,
-      '/dashboard/conversations',
-      supabase,
-    )
-  }
+          const previousLeadScore = (conversation!.metadata as Record<string, unknown>)?.lead_score as number | undefined ?? 50
+          const isNewHotLead = leadScore >= 85 && previousLeadScore < 85
+          const ownerEmail = tenant.business_email as string | undefined
 
-  if (isNewHotLead && ownerEmail) {
-    // Fire-and-forget hot lead alert
-    sendHotLeadAlert(
-      ownerEmail,
-      tenant.business_name ?? 'Your Business',
-      body.contact_identifier,
-      leadScore,
-      conversation!.id as string,
-      updatedMessages.slice(-4),
-      updatedProfile,
-      body.channel,
-    )
-  }
+          if (leadScore >= 85) {
+            await auditLog(supabase, {
+              tenantId,
+              actorId: userId,
+              action: 'lead.hot_detected',
+              resourceType: 'conversation',
+              resourceId: conversation!.id as string,
+              metadata: { lead_score: leadScore, contact_profile: updatedProfile },
+            })
+          }
 
-  if (escalated && conversation!.status !== 'escalated' && ownerEmail) {
-    // Fire-and-forget escalation alert
-    sendEscalationAlert(
-      ownerEmail,
-      tenant.business_name ?? 'Your Business',
-      body.contact_identifier,
-      body.channel,
-      conversation!.id as string,
-      metadata?.suggested_next_action ?? 'Conversation requires human intervention',
-      updatedMessages.slice(-4),
-    )
-  }
+          if (isNewHotLead) {
+            void createNotification(tenantId, 'hot_lead', '🔥 Hot Lead', `Contact scored ${leadScore}/100`, '/dashboard/conversations', supabase)
+          }
 
-  // 13b. Nexus trigger dispatches (fire-and-forget)
-  const triggerBase = {
-    conversation_id:    conversation!.id as string,
-    agent_id:           body.agent_id,
-    channel:            body.channel,
-    contact_identifier: body.contact_identifier,
-    lead_score:         leadScore,
-    sentiment:          metadata?.sentiment ?? 'neutral',
-    dashboard_url:      `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/conversations`,
-  }
+          if (escalated && conversation!.status !== 'escalated') {
+            void createNotification(tenantId, 'escalation', '⚡ Escalation', `${body.contact_identifier} needs attention`, '/dashboard/conversations', supabase)
+          }
 
-  void dispatchTrigger(tenantId, 'conversation.message', triggerBase, supabase)
+          if (isNewHotLead && ownerEmail) {
+            sendHotLeadAlert(
+              ownerEmail,
+              tenant.business_name ?? 'Your Business',
+              body.contact_identifier,
+              leadScore,
+              conversation!.id as string,
+              updatedMessages.slice(-4),
+              updatedProfile,
+              body.channel,
+            )
+          }
 
-  if (isNewHotLead) {
-    void dispatchTrigger(tenantId, 'lead.hot_detected', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
-  }
+          if (escalated && conversation!.status !== 'escalated' && ownerEmail) {
+            sendEscalationAlert(
+              ownerEmail,
+              tenant.business_name ?? 'Your Business',
+              body.contact_identifier,
+              body.channel,
+              conversation!.id as string,
+              metadata?.suggested_next_action ?? 'Conversation requires human intervention',
+              updatedMessages.slice(-4),
+            )
+          }
 
-  if (escalated && conversation!.status !== 'escalated') {
-    void dispatchTrigger(tenantId, 'conversation.escalated', {
-      ...triggerBase,
-      reason: metadata?.suggested_next_action ?? 'Human intervention required',
-    }, supabase)
-  }
+          const triggerBase = {
+            conversation_id:    conversation!.id as string,
+            agent_id:           body.agent_id,
+            channel:            body.channel,
+            contact_identifier: body.contact_identifier,
+            lead_score:         leadScore,
+            sentiment:          metadata?.sentiment ?? 'neutral',
+            dashboard_url:      `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/dashboard/conversations`,
+          }
 
-  const sentiment = metadata?.sentiment ?? 'neutral'
-  if (sentiment === 'frustrated') {
-    void dispatchTrigger(tenantId, 'sentiment.frustrated', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
-  }
-  if (sentiment === 'excited') {
-    void dispatchTrigger(tenantId, 'sentiment.excited', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
-  }
+          void dispatchTrigger(tenantId, 'conversation.message', triggerBase, supabase)
+          if (isNewHotLead) {
+            void dispatchTrigger(tenantId, 'lead.hot_detected', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
+          }
+          if (escalated && conversation!.status !== 'escalated') {
+            void dispatchTrigger(tenantId, 'conversation.escalated', { ...triggerBase, reason: metadata?.suggested_next_action ?? 'Human intervention required' }, supabase)
+          }
 
-  // 13c. Score conversation for Orion (non-blocking)
-  scoreConversation(agent.agent_type, messages, {
-    escalated,
-    lead_score: leadScore,
-    sentiment: metadata?.sentiment ?? 'neutral',
-    resolved: false
-  }).catch(e => console.error('Orion scoring error:', e))
+          const sentiment = metadata?.sentiment ?? 'neutral'
+          if (sentiment === 'frustrated') void dispatchTrigger(tenantId, 'sentiment.frustrated', { ...triggerBase, contact_name: body.contact_identifier }, supabase)
+          if (sentiment === 'excited')    void dispatchTrigger(tenantId, 'sentiment.excited',    { ...triggerBase, contact_name: body.contact_identifier }, supabase)
 
-  // 14. Message audit log
-  await auditLog(supabase, {
-    tenantId,
-    actorId: userId,
-    action: 'conversation.message',
-    resourceType: 'conversation',
-    resourceId: conversation!.id as string,
-    metadata: {
-      model: claudeResult!.model,
-      tokens: claudeResult!.tokensUsed,
-      cost_pkr: claudeResult!.estimatedCostPkr,
-      confidence,
-      escalated,
-      lead_score: leadScore,
-      sentiment: metadata?.sentiment,
-    },
+          scoreConversation(agent.agent_type, messages, {
+            escalated,
+            lead_score: leadScore,
+            sentiment: metadata?.sentiment ?? 'neutral',
+            resolved: false
+          }).catch(e => console.error('Orion scoring error:', e))
+
+          await auditLog(supabase, {
+            tenantId,
+            actorId: userId,
+            action: 'conversation.message',
+            resourceType: 'conversation',
+            resourceId: conversation!.id as string,
+            metadata: {
+              model:      modelUsed,
+              tokens:     0,
+              cost_pkr:   0,
+              confidence,
+              escalated,
+              lead_score: leadScore,
+              sentiment:  metadata?.sentiment,
+            },
+          })
+        } catch (e) {
+          console.error('Post-processing error:', e)
+        }
+      })()
+    }
   })
 
-  return ok({
-    conversation_id:       conversation!.id,
-    response:              cleanResponse,
-    confidence,
-    escalated,
-    model_used:            claudeResult!.model,
-    tokens_used:           claudeResult!.tokensUsed,
-    cost_pkr:              claudeResult!.estimatedCostPkr,
-    lead_score:            leadScore,
-    lead_label:            getLeadLabel(leadScore),
-    sentiment:             metadata?.sentiment || 'neutral',
-    emotional_state:       emotion.state,
-    emotional_intensity:   emotion.intensity,
-    contact_profile:       updatedProfile,
-    suggested_next_action: metadata?.suggested_next_action || 'continue',
-    memory: memory ? {
-      relationship_score:  memory.relationship_score,
-      total_interactions:  memory.total_interactions,
-      total_value_pkr:     memory.total_value_pkr,
-    } : null,
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    }
   })
 }
 

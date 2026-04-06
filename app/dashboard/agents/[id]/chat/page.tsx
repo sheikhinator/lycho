@@ -36,11 +36,16 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   // Scroll to bottom on new message
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  // Fetch agent name
+  // Fetch agent name + set welcome message
   useEffect(() => {
     fetch(`/api/agents/${agentId}`)
       .then(r => r.json())
-      .then(j => { if (j.data?.display_name) setAgentName(j.data.display_name) })
+      .then(j => {
+        if (j.data?.display_name) {
+          setAgentName(j.data.display_name)
+          setMessages([{ role: 'assistant', content: `Hi, I'm your ${j.data.display_name}. How can I help you today?` }])
+        }
+      })
       .catch(() => {})
   }, [agentId])
 
@@ -75,13 +80,14 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
     setFiles([])
     setSending(true)
 
-    // Optimistic user message
     const userMsg: Message = {
       role: 'user',
       content: text,
       files: attachedFiles.map(af => ({ name: af.file.name, url: af.preview ?? '', type: af.file.type })),
     }
     setMessages(prev => [...prev, userMsg])
+    // Add empty assistant message to stream into
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
     try {
       const res = await fetch('/api/conversations', {
@@ -95,22 +101,42 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
         })
       })
 
-      // Robust handling: try to parse JSON, but fall back gracefully if response isn't JSON
-      let json: any = {}
-      try { json = await res.json() } catch {
-        json = {}
+      if (!res.ok) {
+        let errorMsg = 'Error — please try again'
+        try { const j = await res.json(); errorMsg = j?.error ?? j?.message ?? errorMsg } catch {}
+        setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: errorMsg }; return u })
+        setSending(false)
+        return
       }
 
-      // Non-OK handling with minimal UX disruption
-      if (!res.ok) {
-        const agentResponse = json?.data?.response ?? json?.response ?? json?.message ?? 'No response received'
-        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${agentResponse}` }])
-      } else {
-        const agentResponse = json?.data?.response ?? json?.response ?? json?.message ?? 'No response received'
-        setMessages(prev => [...prev, { role: 'assistant', content: agentResponse }])
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      if (!reader) throw new Error('No stream')
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.text) {
+                setMessages(prev => {
+                  const updated = [...prev]
+                  updated[updated.length - 1] = {
+                    ...updated[updated.length - 1],
+                    content: updated[updated.length - 1].content + data.text
+                  }
+                  return updated
+                })
+              }
+            } catch {}
+          }
+        }
       }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Network error — please try again.' }])
+      setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: 'Network error — please try again.' }; return u })
     }
     setSending(false)
   }, [sending, input, files, agentId])
