@@ -82,45 +82,47 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   async function startRecording() {
     setMicError('')
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMicError('Microphone not supported — use HTTPS or a modern browser')
+      setMicError('Microphone not supported — requires HTTPS and a modern browser')
       return
     }
-    let stream: MediaStream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (msg.includes('denied') || msg.includes('Permission')) {
-        setMicError('Microphone access denied — allow it in browser settings')
-      } else {
-        setMicError('Could not access microphone')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
       }
-      setTimeout(() => setMicError(''), 5000)
-      return
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const formData = new FormData()
+        formData.append('audio', audioBlob)
+        try {
+          const res = await fetch('/api/voice/transcribe', { method: 'POST', body: formData })
+          const { transcript } = await res.json()
+          if (transcript) setInput(transcript)
+        } catch {}
+        stream.getTracks().forEach(t => t.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+    } catch (e: unknown) {
+      const name = e instanceof DOMException ? e.name : ''
+      const msg  = e instanceof Error ? e.message : String(e)
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setMicError('Microphone blocked — click the lock icon in your browser address bar and allow microphone')
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setMicError('Microphone is in use by another app — close it and try again')
+      } else if (name === 'NotFoundError') {
+        setMicError('No microphone found — plug one in and try again')
+      } else {
+        setMicError(`Microphone error: ${name || msg}`)
+      }
+      setTimeout(() => setMicError(''), 6000)
     }
-
-    const mediaRecorder = new MediaRecorder(stream)
-    mediaRecorderRef.current = mediaRecorder
-    audioChunksRef.current = []
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data)
-    }
-
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-      const formData = new FormData()
-      formData.append('audio', audioBlob)
-      try {
-        const res = await fetch('/api/voice/transcribe', { method: 'POST', body: formData })
-        const { transcript } = await res.json()
-        if (transcript) setInput(transcript)
-      } catch {}
-      stream.getTracks().forEach(t => t.stop())
-    }
-
-    mediaRecorder.start()
-    setIsRecording(true)
   }
 
   function stopRecording() {
