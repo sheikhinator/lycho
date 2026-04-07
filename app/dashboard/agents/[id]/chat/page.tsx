@@ -2,7 +2,7 @@
 
 import { use, useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Send, Paperclip, X, Bot, User, ImageIcon, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Paperclip, X, Bot, User, FileText, Loader2, Mic, Volume2 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 
@@ -29,9 +29,14 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   const [agentName, setAgentName]   = useState('Agent')
   const [planError, setPlanError]   = useState(false)
   const [agentError, setAgentError] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isPlaying, setIsPlaying]     = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
   const bottomRef  = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef   = useRef<Blob[]>([])
 
   // Scroll to bottom on new message
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -70,6 +75,54 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
       copy.splice(idx, 1)
       return copy
     })
+  }
+
+  async function startRecording() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mediaRecorder = new MediaRecorder(stream)
+    mediaRecorderRef.current = mediaRecorder
+    audioChunksRef.current = []
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data)
+    }
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+      const formData = new FormData()
+      formData.append('audio', audioBlob)
+      try {
+        const res = await fetch('/api/voice/transcribe', { method: 'POST', body: formData })
+        const { transcript } = await res.json()
+        if (transcript) setInput(transcript)
+      } catch {}
+      stream.getTracks().forEach(t => t.stop())
+    }
+
+    mediaRecorder.start()
+    setIsRecording(true)
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  async function playResponse(text: string) {
+    if (!voiceEnabled) return
+    setIsPlaying(true)
+    try {
+      const res = await fetch('/api/voice/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      const audioBlob = await res.blob()
+      const url = URL.createObjectURL(audioBlob)
+      const audio = new Audio(url)
+      audio.onended = () => { setIsPlaying(false); URL.revokeObjectURL(url) }
+      audio.play()
+    } catch { setIsPlaying(false) }
   }
 
   const send = useCallback(async () => {
@@ -135,11 +188,17 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
           }
         }
       }
+      // Play full response as audio if voice is enabled
+      setMessages(prev => {
+        const fullText = prev[prev.length - 1]?.content
+        if (fullText) playResponse(fullText)
+        return prev
+      })
     } catch {
       setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: 'assistant', content: 'Network error — please try again.' }; return u })
     }
     setSending(false)
-  }, [sending, input, files, agentId])
+  }, [sending, input, files, agentId, voiceEnabled])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
@@ -313,6 +372,29 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
               className="flex-1 bg-transparent text-sm font-sans outline-none resize-none"
               style={{ color: '#F0EBE1', maxHeight: '120px', overflowY: 'auto' }}
             />
+
+            {/* Voice toggle */}
+            <button
+              onClick={() => setVoiceEnabled(v => !v)}
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all mb-0.5"
+              style={{ background: voiceEnabled ? 'rgba(201,168,76,0.15)' : 'transparent', border: `1px solid ${voiceEnabled ? 'rgba(201,168,76,0.4)' : '#2a2a2a'}`, color: voiceEnabled ? '#C9A84C' : '#6b6b6b' }}
+              title="Toggle voice mode"
+            >
+              {isPlaying ? <Loader2 size={14} className="animate-spin" /> : <Volume2 size={14} />}
+            </button>
+
+            {/* Mic — hold to record */}
+            <button
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all mb-0.5"
+              style={{ background: isRecording ? '#ef4444' : 'transparent', border: `1px solid ${isRecording ? '#ef4444' : '#2a2a2a'}`, color: isRecording ? '#fff' : '#6b6b6b' }}
+              title="Hold to speak"
+            >
+              <Mic size={14} />
+            </button>
 
             <button onClick={send} disabled={sending || (!input.trim() && files.length === 0)}
               className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all mb-0.5"
