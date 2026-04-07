@@ -2,385 +2,506 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClientSupabase } from '@/lib/supabase'
 
-// ─── constants ──────────────────────────────────────────────────────────────
-const SPRITES: Record<string, { emoji: string; color: string; size: number; role: string }> = {
-  orion:      { emoji: '👑', color: '#fbbf24', size: 48, role: 'Queen Intelligence' },
-  forge:      { emoji: '⚒️', color: '#fb923c', size: 40, role: 'Agent Builder' },
-  guardian:   { emoji: '🛡️', color: '#dc2626', size: 40, role: 'Security' },
-  veritas:    { emoji: '🔍', color: '#818cf8', size: 36, role: 'Quality' },
-  nexus:      { emoji: '⚡', color: '#34d399', size: 36, role: 'Automation' },
-  intake:     { emoji: '📥', color: '#4ade80', size: 32, role: 'Lead Intake' },
-  research:   { emoji: '🔬', color: '#60a5fa', size: 32, role: 'Research' },
-  operations: { emoji: '⚙️', color: '#f97316', size: 32, role: 'Operations' },
-  client:     { emoji: '💝', color: '#ec4899', size: 32, role: 'Client Relations' },
-  analyst:    { emoji: '📊', color: '#a78bfa', size: 32, role: 'Analytics' },
-  compliance: { emoji: '⚖️', color: '#ef4444', size: 32, role: 'Compliance' },
-  content:    { emoji: '✍️', color: '#C9A84C', size: 32, role: 'Content' },
+// ── agent definitions ─────────────────────────────────────────────────────────
+const AGENT_DEFS: Record<string, { bodyColor:string; shirtColor:string; hairColor:string; role:string; building:string; buildingColor:string }> = {
+  orion:      { bodyColor:'#f5c89a', shirtColor:'#fbbf24', hairColor:'#1a1a1a', role:'Queen Intelligence', building:'Orion Palace',    buildingColor:'#fbbf24' },
+  forge:      { bodyColor:'#f5c89a', shirtColor:'#fb923c', hairColor:'#7c3f00', role:'Agent Builder',     building:'Forge Workshop',   buildingColor:'#fb923c' },
+  guardian:   { bodyColor:'#f5c89a', shirtColor:'#dc2626', hairColor:'#1a1a1a', role:'Security',          building:'Guardian Tower',   buildingColor:'#dc2626' },
+  veritas:    { bodyColor:'#f5c89a', shirtColor:'#818cf8', hairColor:'#4b2990', role:'Quality',           building:'Veritas Lab',      buildingColor:'#818cf8' },
+  nexus:      { bodyColor:'#f5c89a', shirtColor:'#34d399', hairColor:'#1a4a3a', role:'Automation',        building:'Nexus Hub',        buildingColor:'#34d399' },
+  intake:     { bodyColor:'#f5c89a', shirtColor:'#4ade80', hairColor:'#1a1a1a', role:'Lead Intake',       building:'Intake Office',    buildingColor:'#4ade80' },
+  research:   { bodyColor:'#f5c89a', shirtColor:'#60a5fa', hairColor:'#1a1a1a', role:'Research',          building:'Research Lab',     buildingColor:'#60a5fa' },
+  operations: { bodyColor:'#f5c89a', shirtColor:'#f97316', hairColor:'#4a2000', role:'Operations',        building:'Ops Centre',       buildingColor:'#f97316' },
+  client:     { bodyColor:'#f5c89a', shirtColor:'#ec4899', hairColor:'#1a1a1a', role:'Client Relations',  building:'Client Suite',     buildingColor:'#ec4899' },
+  analyst:    { bodyColor:'#f5c89a', shirtColor:'#a78bfa', hairColor:'#2a1a6a', role:'Analytics',         building:'Analytics Tower',  buildingColor:'#a78bfa' },
+  compliance: { bodyColor:'#f5c89a', shirtColor:'#ef4444', hairColor:'#1a1a1a', role:'Compliance',        building:'Compliance Court', buildingColor:'#ef4444' },
+  content:    { bodyColor:'#f5c89a', shirtColor:'#C9A84C', hairColor:'#3a2000', role:'Content',           building:'Content Studio',   buildingColor:'#C9A84C' },
 }
+
+const TILE = { GRASS:0, ROAD_H:1, ROAD_V:2, ROAD_X:3, BUILDING:4, TREE:5, FLOWER:6, WATER:7, PLAZA:8 }
+const TS = 32, MW = 40, MH = 28
+
+const BP: Record<string, {tx:number;ty:number;w:number;h:number}> = {
+  orion:{tx:17,ty:8,w:3,h:2},   forge:{tx:1,ty:1,w:3,h:2},    guardian:{tx:30,ty:1,w:3,h:2},
+  veritas:{tx:1,ty:14,w:3,h:2}, nexus:{tx:30,ty:14,w:3,h:2},  intake:{tx:10,ty:1,w:3,h:2},
+  research:{tx:20,ty:1,w:3,h:2},operations:{tx:10,ty:8,w:3,h:2},client:{tx:30,ty:8,w:3,h:2},
+  analyst:{tx:10,ty:22,w:3,h:2},compliance:{tx:20,ty:22,w:3,h:2},content:{tx:30,ty:22,w:3,h:2},
+}
+
 const MSGS: Record<string, string[]> = {
-  orion:      ['Optimising agents…', 'Intelligence rising', 'Watching the network', 'Strategic brief ready'],
-  forge:      ['Building new agent…', 'Market gap detected', 'Agent ready to deploy', 'Forging intelligence'],
-  guardian:   ['All clear', 'Threat detected!', 'Network secure', 'Blocking injection'],
-  veritas:    ['Quality check…', 'Score: 94/100', 'Response verified', 'Quality approved'],
-  intake:     ['New lead!', 'Hot lead detected!', 'Routing to human', 'Lead scored: 87'],
-  research:   ['Searching web…', 'Market intel gathered', 'Trend emerging', 'Research complete'],
-  operations: ['Task automated', 'Workflow triggered', 'Schedule updated', 'Process optimised'],
-  client:     ['Client happy!', 'Churn risk detected', 'Follow-up sent', 'Retention achieved'],
-  analyst:    ['ROI: 12x', 'Pattern identified', 'Forecast ready', 'Anomaly detected'],
-  compliance: ['Regulation checked', 'Risk flagged!', 'Compliant ✓', 'Policy updated'],
-  content:    ['Content created', 'Post scheduled', 'Copy approved', 'Campaign live'],
-}
-const CONNS: Record<string, string[]> = {
-  orion: ['forge','guardian','veritas','nexus'], forge: ['orion','nexus'],
-  guardian: ['orion','veritas'], veritas: ['orion','guardian'], nexus: ['orion','forge'],
-  intake: ['orion','research','compliance'], research: ['orion','analyst','compliance'],
-  operations: ['orion','nexus'], client: ['orion','analyst'],
-  analyst: ['orion','research'], compliance: ['orion','research'], content: ['orion','research'],
+  orion:['Optimising…','Network stable','Intelligence rising','Strategy updated'],
+  forge:['Building agent…','Market gap found!','New agent ready!','Crafting prompt…'],
+  guardian:['All clear','Scanning…','Threat blocked!','Network secure'],
+  veritas:['Quality: 94%','Response verified','Checking accuracy…','Hallucination caught!'],
+  nexus:['Workflow triggered','Automation running','Task automated!','Schedule updated'],
+  intake:['New lead!','Qualifying…','HOT LEAD! 🔥','Routing to human'],
+  research:['Searching web…','Trend found!','Intel gathered','Report ready'],
+  operations:['Task complete','Workflow done','Process optimised','Reminder sent'],
+  client:['Client happy!','Churn risk!','Relationship built','NPS: 9/10'],
+  analyst:['ROI: 12x','Pattern found!','Forecast ready','Anomaly detected'],
+  compliance:['Compliant ✓','Risk flagged!','Regulation met','Policy checked'],
+  content:['Content live!','Copy approved','Post scheduled','Campaign sent'],
 }
 
-function h2rgb(hex: string) {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '255,255,255'
+// ── types ──────────────────────────────────────────────────────────────────────
+interface Agent { id:string;x:number;y:number;tx:number;ty:number;frame:number;frameTimer:number;facing:string;state:string;message:string;messageTimer:number;walkPath:{x:number;y:number}[];pathTimer:number;conversations:number;level:number }
+interface Visitor { id:string;x:number;y:number;tx:number;ty:number;targetAgent:string;state:string;message:string;messageTimer:number;frame:number;frameTimer:number }
+interface Particle { x:number;y:number;vx:number;vy:number;life:number;maxLife:number;color:string;char:string }
+
+function generateMap(): number[][] {
+  const m: number[][] = Array(MH).fill(null).map(()=>Array(MW).fill(TILE.GRASS))
+  for (let x=0;x<MW;x++){m[6][x]=TILE.ROAD_H;m[13][x]=TILE.ROAD_H;m[20][x]=TILE.ROAD_H}
+  for (let y=0;y<MH;y++){m[y][8]=TILE.ROAD_V;m[y][18]=TILE.ROAD_V;m[y][28]=TILE.ROAD_V}
+  [[6,8],[6,18],[6,28],[13,8],[13,18],[13,28],[20,8],[20,18],[20,28]].forEach(([y,x])=>{m[y][x]=TILE.ROAD_X})
+  for (let y=11;y<=15;y++) for (let x=16;x<=20;x++) if(m[y][x]===TILE.GRASS) m[y][x]=TILE.PLAZA
+  for (let y=0;y<MH;y++) for (let x=0;x<MW;x++) if(m[y][x]===TILE.GRASS&&Math.random()<0.06) m[y][x]=Math.random()<0.5?TILE.TREE:TILE.FLOWER
+  return m
 }
 
-// ─── types ───────────────────────────────────────────────────────────────────
-interface Node { id:string; x:number; y:number; vx:number; vy:number; pulse:number; state:string; lastMsg:string; msgTimer:number; conns:string[]; convos:number; energy:number }
-interface Particle { x:number; y:number; tx:number; ty:number; p:number; color:string; sz:number }
-interface Ev { text:string; color:string; opacity:number; time:number }
+function drawChar(ctx: CanvasRenderingContext2D, x:number, y:number, def:typeof AGENT_DEFS[string]|null, facing:string, frame:number, isClient=false) {
+  const px=Math.floor(x), py=Math.floor(y)
+  const body=isClient?'#e8c9a0':(def?.bodyColor||'#f5c89a')
+  const shirt=isClient?'#6ea8d4':(def?.shirtColor||'#888')
+  const hair=isClient?'#8B4513':(def?.hairColor||'#333')
+  const pants=isClient?'#2d5a87':'#1a3a1a'
+  const bob=frame%2===0?0:-1
+  const lL=frame%4<2?1:-1
 
-// ─── component ───────────────────────────────────────────────────────────────
+  ctx.fillStyle='rgba(0,0,0,0.2)';ctx.beginPath();ctx.ellipse(px,py+14,6,2,0,0,Math.PI*2);ctx.fill()
+  ctx.fillStyle=pants;ctx.fillRect(px-3,py+7+bob,3,6);ctx.fillRect(px+1,py+7+bob,3,6)
+  ctx.fillStyle='#2a1a0a';ctx.fillRect(px-4,py+12+bob,3,2);ctx.fillRect(px,py+12+bob,3,2)
+  ctx.fillStyle=shirt;ctx.fillRect(px-4,py-1+bob,8,8)
+  ctx.fillStyle=shirt;ctx.fillRect(px-6,py+lL+bob,2,5);ctx.fillRect(px+4,py-lL+bob,2,5)
+  ctx.fillStyle=body;ctx.fillRect(px-6,py+4+bob,2,2);ctx.fillRect(px+4,py+4+bob,2,2)
+  ctx.fillStyle=body;ctx.fillRect(px-1,py-3+bob,2,3)
+  ctx.fillStyle=body;ctx.fillRect(px-4,py-10+bob,8,8)
+  ctx.fillStyle=hair;ctx.fillRect(px-4,py-10+bob,8,3)
+  if(facing!=='up'){ctx.fillRect(px-5,py-9+bob,2,5);ctx.fillRect(px+3,py-9+bob,2,5)}
+  if(facing!=='up'){
+    ctx.fillStyle='#1a1a1a';ctx.fillRect(px-2,py-6+bob,1,2);ctx.fillRect(px+1,py-6+bob,1,2)
+    ctx.fillStyle='#fff';ctx.fillRect(px-1,py-6+bob,1,1);ctx.fillRect(px+2,py-6+bob,1,1)
+    ctx.fillStyle='#c07060';ctx.fillRect(px-1,py-4+bob,2,1)
+  }
+}
+
+function drawBuilding(ctx:CanvasRenderingContext2D, tx:number,ty:number,w:number,h:number,color:string,name:string,isActive:boolean,tod:number) {
+  const x=tx*TS,y=ty*TS,pw=w*TS,ph=h*TS
+  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(x+4,y+4,pw,ph)
+  ctx.fillStyle='#1a1a2a';ctx.fillRect(x,y,pw,ph)
+  ctx.fillStyle='#222235';for(let wy=y+4;wy<y+ph-4;wy+=8)ctx.fillRect(x+4,wy,pw-8,4)
+  ctx.fillStyle=color;ctx.fillRect(x,y,pw,8)
+  ctx.fillStyle=`${color}aa`;ctx.fillRect(x,y+8,pw,4)
+  const wLight=isActive&&(tod<0.3||tod>0.7)?`${color}cc`:isActive?`${color}66`:'#111122'
+  ctx.fillStyle=wLight;ctx.fillRect(x+6,y+14,8,6);ctx.fillRect(x+pw-14,y+14,8,6)
+  if(isActive&&(tod<0.3||tod>0.7)){
+    const g=ctx.createRadialGradient(x+10,y+17,0,x+10,y+17,20)
+    g.addColorStop(0,`${color}44`);g.addColorStop(1,'transparent')
+    ctx.fillStyle=g;ctx.fillRect(x-10,y+7,40,40)
+  }
+  ctx.fillStyle='#3a2a1a';ctx.fillRect(x+pw/2-4,y+ph-10,8,10)
+  ctx.fillStyle='#C9A84C';ctx.fillRect(x+pw/2+2,y+ph-7,2,2)
+  ctx.font=`bold ${Math.min(9,pw/name.length*1.2)}px DM Sans,sans-serif`
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(name,x+pw/2,y-2)
+  if(isActive){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x+pw-4,y+4,3,0,Math.PI*2);ctx.fill()}
+}
+
+function drawTile(ctx:CanvasRenderingContext2D, tile:number, x:number, y:number, tod:number) {
+  const px=x*TS,py=y*TS,S=TS
+  if(tile===TILE.GRASS){
+    const g=Math.floor(40+Math.sin(x*3.7+y*2.3)*8)
+    ctx.fillStyle=`rgb(${g},${g+30},${g})`;ctx.fillRect(px,py,S,S)
+    if((x+y)%3===0){ctx.fillStyle=`rgb(${g+10},${g+40},${g+10})`;ctx.fillRect(px+4,py+6,2,4);ctx.fillRect(px+10,py+3,2,5)}
+  } else if(tile===TILE.ROAD_H){
+    ctx.fillStyle='#2a2a35';ctx.fillRect(px,py,S,S)
+    ctx.fillStyle='#C9A84C44';ctx.fillRect(px+4,py+S/2-1,S-8,1)
+  } else if(tile===TILE.ROAD_V){
+    ctx.fillStyle='#2a2a35';ctx.fillRect(px,py,S,S)
+    ctx.fillStyle='#C9A84C44';ctx.fillRect(px+S/2-1,py+4,1,S-8)
+  } else if(tile===TILE.ROAD_X){
+    ctx.fillStyle='#2a2a35';ctx.fillRect(px,py,S,S)
+    ctx.fillStyle='#C9A84C33';ctx.fillRect(px+8,py+8,S-16,S-16)
+  } else if(tile===TILE.PLAZA){
+    ctx.fillStyle='#3a3530';ctx.fillRect(px,py,S,S)
+    ctx.fillStyle='#4a4540';for(let i=0;i<S;i+=8){ctx.fillRect(px+i,py,1,S);ctx.fillRect(px,py+i,S,1)}
+  } else if(tile===TILE.TREE){
+    ctx.fillStyle='#2a4a2a';ctx.fillRect(px,py,S,S)
+    ctx.fillStyle='#5a3a1a';ctx.fillRect(px+S/2-3,py+S/2,6,S/2)
+    ctx.fillStyle='#1a6a1a';ctx.beginPath();ctx.arc(px+S/2,py+S/2-2,10,0,Math.PI*2);ctx.fill()
+    ctx.fillStyle='#2a8a2a';ctx.beginPath();ctx.arc(px+S/2,py+S/2-6,8,0,Math.PI*2);ctx.fill()
+    ctx.fillStyle='#3aaa3a';ctx.beginPath();ctx.arc(px+S/2,py+S/2-9,5,0,Math.PI*2);ctx.fill()
+  } else if(tile===TILE.FLOWER){
+    ctx.fillStyle='#3a6a3a';ctx.fillRect(px,py,S,S)
+    const fc=['#ff6688','#ffaa44','#ff44aa','#44aaff','#ffff44'][(x+y)%5]
+    ctx.fillStyle=fc;ctx.beginPath();ctx.arc(px+S/2,py+S/2,4,0,Math.PI*2);ctx.fill()
+    ctx.fillStyle='#ffff88';ctx.beginPath();ctx.arc(px+S/2,py+S/2,2,0,Math.PI*2);ctx.fill()
+  } else if(tile===TILE.WATER){
+    const wave=Math.sin(Date.now()/800+x+y)*0.1
+    ctx.fillStyle=`hsl(210,70%,${30+wave*10}%)`;ctx.fillRect(px,py,S,S)
+  }
+  void tod
+}
+
+// ── component ─────────────────────────────────────────────────────────────────
 export default function WorldPage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const supabase  = createClientSupabase()
+  const canvasRef  = useRef<HTMLCanvasElement>(null)
+  const agentsRef  = useRef<Record<string,Agent>>({})
+  const visitorsRef= useRef<Visitor[]>([])
+  const partsRef   = useRef<Particle[]>([])
+  const mapRef     = useRef<number[][]>(generateMap())
+  const camRef     = useRef({x:0,y:0})
+  const timeRef    = useRef(0)
+  // mutable refs read by rAF loop — changed by UI without restarting loop
+  const selRef     = useRef<string|null>(null)
+  const weatherRef = useRef<'clear'|'rain'|'storm'>('clear')
+  const chatQRef   = useRef<{agent:string;msg:string;color:string}[]>([])
+  // exposed for realtime useEffect
+  const spawnRef   = useRef<(x:number,y:number,c:string,n?:number)=>void>(()=>{})
+  const roadRef    = useRef<(fx:number,fy:number,tx:number,ty:number)=>{x:number,y:number}[]>(()=>[])
 
-  // React state — updated only 1x/sec via setInterval, never from rAF
-  const [agentCount, setAgentCount]   = useState(12)
-  const [mood, setMood]               = useState<'peaceful'|'active'|'alert'>('peaceful')
-  const [showLegend, setShowLegend]   = useState(true)
-  const [selected, setSelected]       = useState<Node | null>(null)
+  // React state — display only, never set from rAF
+  const [tod, setTod]         = useState(0.5)
+  const [wx, setWx]           = useState<'clear'|'rain'|'storm'>('clear')
+  const [sel, setSel]         = useState<string|null>(null)
+  const [stats, setStats]     = useState({agents:12,visitors:0})
+  const [chatLog, setChatLog] = useState<{agent:string;msg:string;color:string}[]>([])
 
-  // ─── main effect — everything lives here ─────────────────────────────────
+  const supabase = createClientSupabase()
+
+  // ── main effect — EVERYTHING in here, no useCallback ──────────────────────
   useEffect(() => {
     if (!canvasRef.current) return
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const canvas = canvasRef.current!
-    const supabaseChannel = supabase.channel('world')
+    let raf = 0
 
-    let nodes:    Node[]     = []
-    let parts:    Particle[] = []
-    let events:   Ev[]       = []
-    let time      = 0
-    let raf       = 0
-    let selectedId: string | null = null
-
-    // ── init ──────────────────────────────────────────────────────────────
-    function init(W: number, H: number) {
-      const cx = W / 2, cy = H / 2
-      const types = Object.keys(SPRITES)
-      nodes = types.map((type, i) => {
-        const ring  = i < 5 ? 120 : 240
-        const angle = (i / types.length) * Math.PI * 2 - Math.PI / 2
-        const j     = (Math.random() - 0.5) * 40
-        return {
-          id: type, x: cx + Math.cos(angle)*(ring+j), y: cy + Math.sin(angle)*(ring+j),
-          vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.3,
-          pulse: Math.random()*Math.PI*2, state: 'idle',
-          lastMsg: '', msgTimer: Math.random()*200,
-          conns: CONNS[type] || ['orion'],
-          convos: Math.floor(Math.random()*100),
-          energy: 0.5 + Math.random()*0.5,
-        }
-      })
-    }
-
-    function spawn(from: Node, toId: string, type='msg') {
-      const to = nodes.find(n => n.id === toId)
-      if (!to) return
-      const sp = SPRITES[from.id] || { color: '#888' }
-      parts.push({ x:from.x, y:from.y, tx:to.x, ty:to.y, p:0, color:sp.color, sz: type==='energy'?6:4 })
-      if (parts.length > 80) parts = parts.slice(-60)
-    }
-
-    function addEv(text: string, color: string) {
-      events.push({ text, color, opacity:1, time:Date.now() })
-      if (events.length > 8) events = events.slice(-8)
-    }
-
-    // ── resize ────────────────────────────────────────────────────────────
-    function resize() {
-      const W = canvas.offsetWidth, H = canvas.offsetHeight
-      if (W < 10 || H < 10) return          // guard against 0-dim flash
-      canvas.width  = W
-      canvas.height = H
-      if (nodes.length === 0) init(W, H)
-      else {
-        // recentre nodes proportionally instead of reinitialising
-        const scaleX = W / (canvas.width  || W)
-        const scaleY = H / (canvas.height || H)
-        nodes.forEach(n => { n.x = Math.max(60, Math.min(W-60, n.x*scaleX)); n.y = Math.max(60, Math.min(H-60, n.y*scaleY)) })
+    // init agents
+    Object.keys(AGENT_DEFS).forEach(id => {
+      const bp = BP[id]; if (!bp) return
+      agentsRef.current[id] = {
+        id, x:bp.tx*TS+TS, y:bp.ty*TS+TS*1.5, tx:bp.tx*TS+TS, ty:bp.ty*TS+TS*1.5,
+        frame:0, frameTimer:0, facing:'down', state:'idle', message:'', messageTimer:0,
+        walkPath:[], pathTimer:Math.random()*200,
+        conversations:Math.floor(Math.random()*500), level:Math.floor(Math.random()*5)+1
       }
+    })
+
+    function spawn(x:number,y:number,color:string,n=5) {
+      const chars=['✦','♥','♪','★','•']
+      for(let i=0;i<n;i++) partsRef.current.push({x,y,vx:(Math.random()-0.5)*3,vy:-Math.random()*3-1,life:1,maxLife:60+Math.random()*40,color,char:chars[Math.floor(Math.random()*chars.length)]})
+      if(partsRef.current.length>200) partsRef.current=partsRef.current.slice(-150)
+    }
+    spawnRef.current = spawn
+
+    function getRoad(fx:number,fy:number,tx:number,ty:number) {
+      const rY=[6,13,20].map(r=>r*TS+TS/2)
+      const rX=[8,18,28].map(r=>r*TS+TS/2)
+      const nY=rY.reduce((a,b)=>Math.abs(a-fy)<Math.abs(b-fy)?a:b)
+      const nX=rX.reduce((a,b)=>Math.abs(a-tx)<Math.abs(b-tx)?a:b)
+      return [{x:fx,y:nY},{x:nX,y:nY},{x:nX,y:ty},{x:tx,y:ty}]
+    }
+    roadRef.current = getRoad
+
+    function updateAgents() {
+      Object.values(agentsRef.current).forEach(a => {
+        const def=AGENT_DEFS[a.id]; if(!def)return
+        a.frameTimer++; if(a.frameTimer>8){a.frame=(a.frame+1)%4;a.frameTimer=0}
+        const dx=a.tx-a.x,dy=a.ty-a.y,dist=Math.hypot(dx,dy)
+        if(dist>2){
+          const spd=1.2; a.x+=dx/dist*spd; a.y+=dy/dist*spd
+          a.facing=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up')
+          a.state='walking'
+        } else {
+          a.pathTimer--
+          if(a.walkPath.length>0){const n=a.walkPath.shift()!;a.tx=n.x;a.ty=n.y}
+          else if(a.pathTimer<=0){
+            a.pathTimer=150+Math.random()*300
+            if(Math.random()<0.3){
+              const px=18*TS+Math.random()*2*TS,py=12*TS+Math.random()*2*TS
+              a.walkPath=getRoad(a.x,a.y,px,py)
+            } else {
+              const bp=BP[a.id]
+              if(bp){a.tx=bp.tx*TS+(Math.random()-0.5)*2*TS+TS;a.ty=bp.ty*TS+(Math.random()-0.5)*2*TS+TS*1.5}
+            }
+            const msgs=MSGS[a.id]||['Working…']
+            a.message=msgs[Math.floor(Math.random()*msgs.length)]
+            a.messageTimer=120; a.state='talking'
+            if(Math.random()<0.3) spawn(a.x,a.y-20,def.shirtColor,3)
+            chatQRef.current.unshift({agent:a.id,msg:a.message,color:def.shirtColor})
+            if(chatQRef.current.length>20) chatQRef.current=chatQRef.current.slice(0,20)
+          } else {a.state='idle';a.facing='down'}
+        }
+        if(a.messageTimer>0){a.messageTimer--;if(a.messageTimer===0)a.message=''}
+      })
     }
 
-    // ── render loop ───────────────────────────────────────────────────────
-    function draw() {
-      raf = requestAnimationFrame(draw)
-      const ctx = canvas.getContext('2d')
-      if (!ctx || canvas.width < 10) return
-      const W = canvas.width, H = canvas.height
-      time += 0.016
-
-      // background
-      ctx.fillStyle = '#070707'; ctx.fillRect(0,0,W,H)
-      ctx.strokeStyle='rgba(255,255,255,0.02)'; ctx.lineWidth=1
-      for (let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
-      for (let y=0;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-      const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,200)
-      g.addColorStop(0,'rgba(201,168,76,0.04)');g.addColorStop(1,'rgba(0,0,0,0)')
-      ctx.fillStyle=g;ctx.fillRect(0,0,W,H)
-
-      // update nodes
-      nodes.forEach(n => {
-        n.x+=n.vx; n.y+=n.vy
-        if(n.x<60||n.x>W-60)n.vx*=-1
-        if(n.y<60||n.y>H-60)n.vy*=-1
-        n.vx*=0.995; n.vy*=0.995
-        n.pulse+=0.05+(n.state==='thinking'?0.05:0)
-        n.msgTimer--
-        if(n.msgTimer<=0){
-          n.msgTimer=150+Math.random()*300
-          const msgs=MSGS[n.id]||['Working…']
-          n.lastMsg=msgs[Math.floor(Math.random()*msgs.length)]
-          const roll=Math.random()
-          n.state=roll<0.1?'celebrating':roll<0.2?'alert':roll<0.3?'thinking':roll<0.05?'sleeping':'speaking'
-          if(n.conns.length&&Math.random()<0.6)
-            spawn(n,n.conns[Math.floor(Math.random()*n.conns.length)],Math.random()<0.2?'energy':'msg')
-          if(Math.random()<0.15){
-            const sp=SPRITES[n.id]||{emoji:'🤖',color:'#888'}
-            addEv(`${sp.emoji} ${n.id.toUpperCase()}: ${n.lastMsg}`, sp.color)
-          }
+    function updateVisitors() {
+      visitorsRef.current=visitorsRef.current.filter(v=>{
+        v.frameTimer++;if(v.frameTimer>10){v.frame=(v.frame+1)%4;v.frameTimer=0}
+        const dx=v.tx-v.x,dy=v.ty-v.y,dist=Math.hypot(dx,dy)
+        if(dist>2){v.x+=dx/dist*1.5;v.y+=dy/dist*1.5}
+        else if(v.state==='walking'){
+          v.state='talking';v.messageTimer=200
+          const a=agentsRef.current[v.targetAgent]
+          if(a){a.state='talking';a.message='Helping client…';a.messageTimer=180;spawn(a.x,a.y-20,AGENT_DEFS[v.targetAgent]?.shirtColor||'#fff',4)}
+        } else if(v.state==='talking'){
+          v.messageTimer--
+          if(v.messageTimer<=0){v.state='leaving';v.tx=-100}
         }
-        if(n.state==='celebrating'&&Math.random()<0.02)n.state='idle'
-        if(n.state==='alert'&&Math.random()<0.015)n.state='idle'
-        if(n.state==='speaking'&&Math.random()<0.01)n.state='idle'
+        return !(v.state==='leaving'&&v.x<-60)
+      })
+    }
+
+    function draw() {
+      raf=requestAnimationFrame(draw)
+      const ctx=canvas.getContext('2d')
+      if(!ctx||canvas.width<10)return
+      const W=canvas.width,H=canvas.height
+      timeRef.current++
+
+      const t=((Date.now()/1000/1800)%1)
+      let sR=7,sG=7,sB=30
+      if(t>0.3&&t<0.75){const p=(t-0.3)/0.45;sR=Math.floor(50+p*107);sG=Math.floor(30+p*77);sB=Math.floor(80+p*20-p*50)}
+      ctx.fillStyle=`rgb(${sR},${sG},${sB})`;ctx.fillRect(0,0,W,H)
+
+      const camX=Math.max(0,Math.min(MW*TS-W,MW*TS/2-W/2))
+      const camY=Math.max(0,Math.min(MH*TS-H,MH*TS/2-H/2))
+      camRef.current={x:camX,y:camY}
+      ctx.save();ctx.translate(-camX,-camY)
+
+      // tiles
+      const map=mapRef.current
+      const sX=Math.floor(camX/TS),eX=Math.min(MW,Math.ceil((camX+W)/TS)+1)
+      const sY=Math.floor(camY/TS),eY=Math.min(MH,Math.ceil((camY+H)/TS)+1)
+      for(let ty=sY;ty<eY;ty++) for(let tx=sX;tx<eX;tx++) drawTile(ctx,map[ty][tx],tx,ty,t)
+
+      // buildings
+      Object.entries(BP).forEach(([id,bp])=>{
+        const def=AGENT_DEFS[id],a=agentsRef.current[id]
+        if(!def)return
+        drawBuilding(ctx,bp.tx,bp.ty,bp.w,bp.h,def.buildingColor,def.building,a?.state!=='idle',t)
       })
 
-      // connection lines
-      nodes.forEach(n=>{
-        n.conns.forEach(tid=>{
-          const t=nodes.find(x=>x.id===tid); if(!t)return
-          const sp=SPRITES[n.id]||{color:'#888'}
-          const dist=Math.hypot(t.x-n.x,t.y-n.y)
-          const alpha=Math.max(0,0.15-dist/3000)
-          ctx.strokeStyle=`${sp.color}${Math.floor(alpha*255).toString(16).padStart(2,'0')}`
-          ctx.lineWidth=1;ctx.setLineDash([4,8])
-          ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(t.x,t.y);ctx.stroke()
-          ctx.setLineDash([])
-        })
+      // stars
+      if(t<0.3||t>0.75){
+        const sa=Math.min(0.8,t<0.3?(0.3-t)/0.1*0.8:(t-0.75)/0.1*0.8)
+        for(let i=0;i<60;i++){
+          const tw=Math.sin(timeRef.current*0.05+i)*0.3+0.7
+          ctx.fillStyle=`rgba(255,255,220,${sa*tw})`
+          ctx.beginPath();ctx.arc((i*137+50)%(MW*TS),(i*97+30)%(MH*TS/2),1.5,0,Math.PI*2);ctx.fill()
+        }
+      }
+
+      // sun
+      if(t>0.3&&t<0.75){
+        const sx=MW*TS*((t-0.3)/0.45),sy=60-Math.sin((t-0.3)/0.45*Math.PI)*40
+        const sg=ctx.createRadialGradient(sx,sy,0,sx,sy,30)
+        sg.addColorStop(0,'#fffacc');sg.addColorStop(0.3,'#ffd700cc');sg.addColorStop(1,'transparent')
+        ctx.fillStyle=sg;ctx.fillRect(sx-30,sy-30,60,60)
+      }
+
+      // rain
+      const w=weatherRef.current
+      if(w==='rain'||w==='storm'){
+        ctx.strokeStyle=`rgba(150,180,255,${w==='storm'?0.6:0.3})`;ctx.lineWidth=1
+        for(let i=0;i<100;i++){
+          const rx=(i*173+timeRef.current*3)%(MW*TS),ry=(i*97+timeRef.current*5)%(MH*TS)
+          ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(rx-2,ry+8);ctx.stroke()
+        }
+      }
+
+      updateAgents();updateVisitors()
+
+      // sort & draw entities by Y
+      const items:Array<{y:number;fn:()=>void}>=[]
+      Object.values(agentsRef.current).forEach(a=>{
+        const def=AGENT_DEFS[a.id];if(!def)return
+        items.push({y:a.y,fn:()=>{
+          if(selRef.current===a.id){ctx.strokeStyle=def.shirtColor;ctx.lineWidth=2;ctx.beginPath();ctx.arc(a.x,a.y+6,14,0,Math.PI*2);ctx.stroke()}
+          drawChar(ctx,a.x,a.y,def,a.facing,a.frame)
+          ctx.font='bold 8px DM Sans';ctx.fillStyle=def.shirtColor;ctx.textAlign='center';ctx.textBaseline='top'
+          ctx.fillText(a.id.toUpperCase(),a.x,a.y+16)
+          if(a.message){
+            ctx.font='9px DM Sans,sans-serif'
+            const tw2=ctx.measureText(a.message).width,bw=tw2+12,bh=16,bx=a.x-bw/2,by=a.y-35
+            ctx.fillStyle='rgba(10,10,20,0.92)';ctx.strokeStyle=def.shirtColor;ctx.lineWidth=1.5
+            ctx.beginPath();ctx.roundRect(bx,by,bw,bh,4);ctx.fill();ctx.stroke()
+            ctx.fillStyle='rgba(10,10,20,0.92)';ctx.beginPath();ctx.moveTo(a.x-3,by+bh);ctx.lineTo(a.x+3,by+bh);ctx.lineTo(a.x,by+bh+5);ctx.closePath();ctx.fill()
+            ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(a.message,a.x,by+bh/2)
+          }
+        }})
       })
+      visitorsRef.current.forEach(v=>{
+        items.push({y:v.y,fn:()=>{
+          drawChar(ctx,v.x,v.y,null,'down',v.frame,true)
+          if(v.state==='talking'&&v.message){
+            ctx.font='9px DM Sans';const tw2=ctx.measureText(v.message).width,bw=tw2+12,bh=16,bx=v.x-bw/2,by=v.y-35
+            ctx.fillStyle='rgba(20,20,40,0.92)';ctx.strokeStyle='#6ea8d4';ctx.lineWidth=1.5
+            ctx.beginPath();ctx.roundRect(bx,by,bw,bh,4);ctx.fill();ctx.stroke()
+            ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(v.message,v.x,by+bh/2)
+          }
+        }})
+      })
+      items.sort((a,b)=>a.y-b.y);items.forEach(i=>i.fn())
 
       // particles
-      parts=parts.filter(p=>p.p<1)
-      parts.forEach(p=>{
-        p.p+=0.018
-        const t=p.p,mx=(p.x+p.tx)/2,my=(p.ty+p.y)/2-40
-        const bx=(1-t)*(1-t)*p.x+2*(1-t)*t*mx+t*t*p.tx
-        const by=(1-t)*(1-t)*p.y+2*(1-t)*t*my+t*t*p.ty
-        const al=Math.sin(p.p*Math.PI)
-        const gg=ctx.createRadialGradient(bx,by,0,bx,by,p.sz*3)
-        gg.addColorStop(0,`${p.color}${Math.floor(al*200).toString(16).padStart(2,'0')}`)
-        gg.addColorStop(1,'transparent')
-        ctx.fillStyle=gg;ctx.fillRect(bx-p.sz*3,by-p.sz*3,p.sz*6,p.sz*6)
-        ctx.fillStyle=`${p.color}${Math.floor(al*255).toString(16).padStart(2,'0')}`
-        ctx.beginPath();ctx.arc(bx,by,p.sz*al,0,Math.PI*2);ctx.fill()
+      partsRef.current=partsRef.current.filter(p=>p.life>0)
+      partsRef.current.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy-=0.05;p.life-=1/p.maxLife
+        ctx.font=`${Math.floor(10*p.life)}px serif`
+        ctx.fillStyle=`${p.color}${Math.floor(p.life*255).toString(16).padStart(2,'0')}`
+        ctx.textAlign='center';ctx.fillText(p.char,p.x,p.y)
       })
 
-      // draw agents
-      nodes.forEach(n=>{
-        const sp=SPRITES[n.id]||{emoji:'🤖',color:'#888',size:28}
-        const s=sp.size, ps=1+Math.sin(n.pulse)*0.06
-
-        if(n.state==='alert'){
-          const ap=(Math.sin(time*8)+1)/2
-          ctx.strokeStyle=`rgba(239,68,68,${ap*0.8})`;ctx.lineWidth=2
-          ctx.beginPath();ctx.arc(n.x,n.y,s*ps+10+ap*8,0,Math.PI*2);ctx.stroke()
-        }
-        if(n.state==='celebrating'){
-          for(let i=0;i<6;i++){
-            const a=(i/6)*Math.PI*2+time*3, d=s+12+Math.sin(time*5+i)*5
-            ctx.font='10px serif';ctx.fillStyle='#fbbf24'
-            ctx.fillText('✨',n.x+Math.cos(a)*d-5,n.y+Math.sin(a)*d+4)
-          }
-        }
-        if(n.state==='thinking'){
-          for(let i=0;i<3;i++){
-            ctx.fillStyle=`rgba(255,255,255,${Math.sin(time*4+i)>0?1:0.2})`
-            ctx.beginPath();ctx.arc(n.x-8+i*8,n.y-s-8,3,0,Math.PI*2);ctx.fill()
-          }
-        }
-
-        // glow
-        const gg2=ctx.createRadialGradient(n.x,n.y,s*0.5,n.x,n.y,s*2)
-        gg2.addColorStop(0,`${sp.color}40`);gg2.addColorStop(1,'transparent')
-        ctx.fillStyle=gg2;ctx.beginPath();ctx.arc(n.x,n.y,s*2,0,Math.PI*2);ctx.fill()
-
-        // shadow
-        ctx.fillStyle='rgba(0,0,0,0.4)'
-        ctx.beginPath();ctx.ellipse(n.x,n.y+s*0.8,s*0.5,s*0.15,0,0,Math.PI*2);ctx.fill()
-
-        // hex body
-        const sel=selectedId===n.id
-        ctx.fillStyle='#0d0d0d';ctx.strokeStyle=sp.color;ctx.lineWidth=n.state==='alert'?3:sel?2.5:1.5
-        ctx.beginPath()
-        for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2-Math.PI/2,r=s*0.7*ps;i===0?ctx.moveTo(n.x+Math.cos(a)*r,n.y+Math.sin(a)*r):ctx.lineTo(n.x+Math.cos(a)*r,n.y+Math.sin(a)*r)}
-        ctx.closePath();ctx.fill();ctx.stroke()
-
-        // emoji + label
-        ctx.font=`${Math.floor(s*0.55)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle'
-        ctx.fillText(sp.emoji,n.x,n.y)
-        ctx.font='bold 10px DM Sans,sans-serif';ctx.fillStyle=sp.color;ctx.textBaseline='top'
-        ctx.fillText(n.id.toUpperCase(),n.x,n.y+s*0.75)
-
-        // speech bubble
-        if(n.lastMsg&&n.state==='speaking'){
-          ctx.font='10px DM Sans,sans-serif'
-          const tw=ctx.measureText(n.lastMsg).width+12,bx=n.x-tw/2,by=n.y-s-32
-          ctx.fillStyle='#141414';ctx.strokeStyle=sp.color;ctx.lineWidth=1
-          ctx.beginPath();ctx.roundRect(bx,by,tw,20,4);ctx.fill();ctx.stroke()
-          ctx.fillStyle='#141414';ctx.strokeStyle=sp.color
-          ctx.beginPath();ctx.moveTo(n.x-4,by+20);ctx.lineTo(n.x+4,by+20);ctx.lineTo(n.x,by+28);ctx.closePath();ctx.fill();ctx.stroke()
-          ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle'
-          ctx.fillText(n.lastMsg,n.x,by+10)
-        }
-        if(n.state==='sleeping'){ctx.font='14px serif';ctx.fillStyle='rgba(255,255,255,0.5)';ctx.fillText('💤',n.x+s*0.5,n.y-s*0.5)}
-      })
-
-      // event log
-      events.forEach((ev,i)=>{
-        ev.opacity=Math.max(0,1-(Date.now()-ev.time)/6000)
-        ctx.font='11px DM Mono,monospace';ctx.textAlign='left';ctx.textBaseline='top'
-        ctx.fillStyle=`rgba(${h2rgb(ev.color)},${ev.opacity})`
-        ctx.fillText(`› ${ev.text}`,16,20+i*22)
-      })
-      events=events.filter(ev=>ev.opacity>0)
+      // night overlay
+      if(t<0.3||t>0.75){
+        const na=Math.min(0.5,t<0.3?(0.3-t)/0.1*0.5:(t-0.75)/0.1*0.5)
+        ctx.fillStyle=`rgba(0,0,20,${na})`;ctx.fillRect(camX,camY,W,H)
+      }
+      ctx.restore()
     }
 
-    // ── start ─────────────────────────────────────────────────────────────
+    function resize() {
+      const W=canvas.offsetWidth,H=canvas.offsetHeight
+      if(W<10||H<10)return
+      canvas.width=W;canvas.height=H
+    }
+
     resize()
-    window.addEventListener('resize', resize)
+    window.addEventListener('resize',resize)
     draw()
 
-    // React state updates — 1x per second only
-    const statsInterval = setInterval(() => {
-      setAgentCount(nodes.length)
-      const alertCount  = nodes.filter(n=>n.state==='alert').length
-      const activeCount = nodes.filter(n=>n.state!=='idle'&&n.state!=='sleeping').length
-      setMood(alertCount>2?'alert':activeCount>4?'active':'peaceful')
-      // expose selected node for panel
-      setSelected(selectedId ? (nodes.find(n=>n.id===selectedId)||null) : null)
-    }, 1000)
-
-    // canvas click
-    function onClick(e: MouseEvent) {
-      const rect=canvas.getBoundingClientRect()
-      const mx=e.clientX-rect.left, my=e.clientY-rect.top
-      const hit=nodes.find(n=>{const sp=SPRITES[n.id]||{size:28};return Math.hypot(mx-n.x,my-n.y)<sp.size})
-      selectedId=hit?.id||null
-      if(hit){
-        hit.state='celebrating'
-        hit.conns.forEach(cid=>spawn(hit,cid,'energy'))
-        addEv(`Selected ${hit.id.toUpperCase()} — ${hit.convos} conversations`, SPRITES[hit.id]?.color||'#fff')
+    // stats sync — 1x/sec only, never from rAF
+    const interval=setInterval(()=>{
+      setTod(((Date.now()/1000/1800)%1))
+      setStats({agents:Object.keys(agentsRef.current).length,visitors:visitorsRef.current.length})
+      setSel(selRef.current)
+      if(chatQRef.current.length>0){
+        const q=chatQRef.current.splice(0,chatQRef.current.length)
+        setChatLog(prev=>[...q,...prev].slice(0,7))
       }
-    }
-    canvas.addEventListener('click', onClick)
+    },1000)
 
-    // realtime
-    supabaseChannel
+    function onClick(e:MouseEvent){
+      const rect=canvas.getBoundingClientRect()
+      const mx=e.clientX-rect.left+camRef.current.x,my=e.clientY-rect.top+camRef.current.y
+      const hit=Object.values(agentsRef.current).find(a=>Math.hypot(mx-a.x,my-a.y)<20)
+      selRef.current=hit?.id===selRef.current?null:(hit?.id||null)
+      if(hit){hit.state='celebrating';spawn(hit.x,hit.y-20,AGENT_DEFS[hit.id]?.shirtColor||'#fff',6)}
+    }
+    canvas.addEventListener('click',onClick)
+
+    return ()=>{
+      cancelAnimationFrame(raf)
+      clearInterval(interval)
+      window.removeEventListener('resize',resize)
+      canvas.removeEventListener('click',onClick)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[])
+
+  // ── realtime ─────────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    const ch=supabase.channel('world-live')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'syndicate_messages'},(payload)=>{
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const msg=payload.new as any
-        const from=nodes.find(n=>n.id===msg.from_agent)
-        if(from&&msg.to_agent){
-          spawn(from,msg.to_agent,msg.flagged_by_guardian?'alert':msg.message_type==='forge_brief'?'energy':'msg')
-          from.state='speaking'; from.lastMsg=msg.message_type?.replace(/_/g,' ')||'transmitting'
-          addEv(`${msg.from_agent} → ${msg.to_agent}`,SPRITES[msg.from_agent]?.color||'#888')
+        const from=agentsRef.current[msg.from_agent]
+        if(from){
+          from.state='talking';from.message=msg.message_type?.replace(/_/g,' ')||'transmitting…';from.messageTimer=150
+          spawnRef.current(from.x,from.y-20,AGENT_DEFS[msg.from_agent]?.shirtColor||'#fff',4)
+          const to=agentsRef.current[msg.to_agent]
+          if(to&&Math.hypot(to.x-from.x,to.y-from.y)<200&&Math.random()<0.4)
+            from.walkPath=roadRef.current(from.x,from.y,to.x-20,to.y)
+        }
+        if(msg.flagged_by_guardian){
+          const g=agentsRef.current['guardian']
+          if(g){g.message='THREAT BLOCKED! 🚨';g.messageTimer=200;g.state='talking';spawnRef.current(g.x,g.y,'#dc2626',8)}
         }
       })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversations'},(payload)=>{
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c=payload.new as any
+        const ta=c.agent_type||'intake',bp=BP[ta];if(!bp)return
+        visitorsRef.current.push({id:`v${Date.now()}`,x:-40,y:13*TS,tx:bp.tx*TS+TS,ty:bp.ty*TS+TS*2,targetAgent:ta,state:'walking',message:'I need help…',messageTimer:0,frame:0,frameTimer:0})
+      })
       .subscribe()
-
-    // cleanup
-    return () => {
-      cancelAnimationFrame(raf)
-      clearInterval(statsInterval)
-      window.removeEventListener('resize', resize)
-      canvas.removeEventListener('click', onClick)
-      supabase.removeChannel(supabaseChannel)
-    }
+    return ()=>{supabase.removeChannel(ch)}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  },[])
 
-  const moodCfg = { peaceful:{label:'● Peaceful',color:'#4ade80'}, active:{label:'⚡ Active',color:'#C9A84C'}, alert:{label:'🚨 Alert',color:'#ef4444'} }
+  const selDef=sel?AGENT_DEFS[sel]:null
+  const selData=sel?agentsRef.current[sel]:null
+  const todLabel=tod<0.25?'🌙 Night':tod<0.35?'🌅 Dawn':tod<0.6?'☀️ Day':tod<0.75?'🌇 Sunset':'🌙 Night'
 
   return (
     <div style={{height:'100vh',background:'#070707',display:'flex',flexDirection:'column',fontFamily:'DM Sans,sans-serif',overflow:'hidden'}}>
-      {/* header */}
-      <div style={{background:'#0d0d0d',borderBottom:'1px solid #1a1a1a',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+      <div style={{background:'#0d0d0d',borderBottom:'1px solid #1a1a1a',padding:'10px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:16}}>
           <span style={{color:'#C9A84C',fontWeight:700,fontSize:16,letterSpacing:2,fontFamily:'Bebas Neue,sans-serif'}}>✦ LYCHO WORLD</span>
-          <span style={{color:'#444',fontSize:11}}>Agent Society — Live</span>
-          <span style={{color:moodCfg[mood].color,fontSize:12,fontWeight:600}}>{moodCfg[mood].label}</span>
+          <span style={{color:'#444',fontSize:11}}>Live Agent Society</span>
+          <span style={{color:'#666',fontSize:12}}>{todLabel} {wx==='clear'?'☀️':wx==='rain'?'🌧️':'⛈️'}</span>
         </div>
         <div style={{display:'flex',gap:20,alignItems:'center'}}>
-          <div style={{textAlign:'center'}}>
-            <div style={{color:'#C9A84C',fontWeight:700,fontSize:18,fontFamily:'Bebas Neue,sans-serif'}}>{agentCount}</div>
-            <div style={{color:'#444',fontSize:10}}>Agents</div>
+          {[{label:'Agents',value:stats.agents},{label:'Visitors',value:stats.visitors}].map(s=>(
+            <div key={s.label} style={{textAlign:'center'}}>
+              <div style={{color:'#C9A84C',fontWeight:700,fontSize:18,fontFamily:'Bebas Neue,sans-serif'}}>{s.value}</div>
+              <div style={{color:'#444',fontSize:10}}>{s.label}</div>
+            </div>
+          ))}
+          <div style={{display:'flex',gap:6}}>
+            {(['clear','rain','storm'] as const).map(w=>(
+              <button key={w} onClick={()=>{weatherRef.current=w;setWx(w)}}
+                style={{background:wx===w?'#C9A84C':'#141414',color:wx===w?'#070707':'#666',border:'1px solid #2a2a2a',borderRadius:4,padding:'4px 8px',cursor:'pointer',fontSize:11}}>
+                {w==='clear'?'☀️':w==='rain'?'🌧️':'⛈️'}
+              </button>
+            ))}
           </div>
-          <button onClick={()=>setShowLegend(v=>!v)} style={{background:'#141414',border:'1px solid #2a2a2a',borderRadius:6,padding:'6px 12px',color:'#888',cursor:'pointer',fontSize:12}}>
-            {showLegend?'Hide':'Show'} Legend
-          </button>
         </div>
       </div>
 
-      {/* canvas */}
-      <div style={{flex:1,position:'relative',overflow:'hidden'}}>
-        <canvas ref={canvasRef} style={{width:'100%',height:'100%',display:'block'}} />
+      <div style={{flex:1,display:'flex',overflow:'hidden'}}>
+        <canvas ref={canvasRef} style={{flex:1,cursor:'crosshair',imageRendering:'pixelated',display:'block'}} />
 
-        {/* selected agent panel */}
-        {selected && (
-          <div style={{position:'absolute',top:16,right:16,background:'#0d0d0d',border:`1px solid ${SPRITES[selected.id]?.color||'#888'}`,borderRadius:8,padding:20,minWidth:220,boxShadow:`0 0 30px ${SPRITES[selected.id]?.color||'#888'}33`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
-              <div>
-                <div style={{color:SPRITES[selected.id]?.color||'#fff',fontWeight:700,fontSize:16}}>{SPRITES[selected.id]?.emoji} {selected.id.toUpperCase()}</div>
-                <div style={{color:'#666',fontSize:12}}>{SPRITES[selected.id]?.role||'Specialist'}</div>
+        <div style={{width:220,background:'#0d0d0d',borderLeft:'1px solid #1a1a1a',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          {selDef&&selData?(
+            <div style={{padding:16,borderBottom:'1px solid #1a1a1a'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+                <span style={{color:selDef.shirtColor,fontWeight:700,fontSize:14}}>{sel?.toUpperCase()}</span>
+                <button onClick={()=>{selRef.current=null;setSel(null)}} style={{background:'none',border:'none',color:'#444',cursor:'pointer'}}>×</button>
               </div>
-              <button onClick={()=>setSelected(null)} style={{background:'none',border:'none',color:'#444',cursor:'pointer',fontSize:16}}>×</button>
+              <div style={{color:'#666',fontSize:11,marginBottom:10}}>{selDef.role}</div>
+              {[{label:'Building',value:selDef.building},{label:'State',value:selData.state.toUpperCase()},{label:'Level',value:'★'.repeat(selData.level)},{label:'Conversations',value:selData.conversations.toLocaleString()}].map(item=>(
+                <div key={item.label} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #111',fontSize:11}}>
+                  <span style={{color:'#666'}}>{item.label}</span>
+                  <span style={{color:'#fff'}}>{item.value}</span>
+                </div>
+              ))}
             </div>
-            {[{label:'Status',value:selected.state.toUpperCase()},{label:'Conversations',value:selected.convos.toLocaleString()},{label:'Energy',value:`${Math.round(selected.energy*100)}%`},{label:'Connections',value:selected.conns.length}].map(item=>(
-              <div key={item.label} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #111'}}>
-                <span style={{color:'#666',fontSize:12}}>{item.label}</span>
-                <span style={{color:'#fff',fontSize:12,fontWeight:600}}>{item.value}</span>
+          ):(
+            <div style={{padding:16,borderBottom:'1px solid #1a1a1a',color:'#333',fontSize:11}}>Click any agent to inspect</div>
+          )}
+
+          <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+            <div style={{padding:'10px 16px 6px',color:'#444',fontSize:10,fontWeight:700,letterSpacing:1}}>LIVE ACTIVITY</div>
+            <div style={{flex:1,overflowY:'auto',padding:'0 12px 12px'}}>
+              {chatLog.map((log,i)=>(
+                <div key={i} style={{marginBottom:6,opacity:1-i*0.12}}>
+                  <span style={{color:log.color,fontSize:10,fontWeight:700}}>{log.agent.toUpperCase()} </span>
+                  <span style={{color:'#888',fontSize:10}}>{log.msg}</span>
+                </div>
+              ))}
+              {chatLog.length===0&&<div style={{color:'#333',fontSize:11}}>Waiting for activity…</div>}
+            </div>
+          </div>
+
+          <div style={{padding:12,borderTop:'1px solid #1a1a1a'}}>
+            <div style={{color:'#444',fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>AGENTS</div>
+            {Object.entries(AGENT_DEFS).slice(0,6).map(([id,def])=>(
+              <div key={id} style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:def.shirtColor,flexShrink:0}}/>
+                <span style={{color:def.shirtColor,fontSize:10,fontWeight:600}}>{id.toUpperCase()}</span>
               </div>
             ))}
-            {selected.lastMsg&&<div style={{marginTop:12,background:'#141414',borderRadius:6,padding:'8px 10px',color:'#aaa',fontSize:12}}>Last: "{selected.lastMsg}"</div>}
           </div>
-        )}
-
-        {/* legend */}
-        {showLegend&&(
-          <div style={{position:'absolute',bottom:16,right:16,background:'#0d0d0d',border:'1px solid #1a1a1a',borderRadius:8,padding:16,maxWidth:200}}>
-            <div style={{color:'#666',fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:10}}>AGENT SOCIETY</div>
-            {Object.entries(SPRITES).slice(0,8).map(([type,sp])=>(
-              <div key={type} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                <span style={{fontSize:14}}>{sp.emoji}</span>
-                <span style={{color:sp.color,fontSize:11,fontWeight:600}}>{type.toUpperCase()}</span>
-                <span style={{color:'#444',fontSize:10}}>{sp.role}</span>
-              </div>
-            ))}
-            <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #1a1a1a',color:'#444',fontSize:10}}>Click any agent to inspect</div>
-          </div>
-        )}
-
-        <div style={{position:'absolute',bottom:16,left:'50%',transform:'translateX(-50%)',color:'#333',fontSize:11,pointerEvents:'none'}}>
-          Click any agent to inspect • Live via Syndicate
         </div>
       </div>
     </div>
