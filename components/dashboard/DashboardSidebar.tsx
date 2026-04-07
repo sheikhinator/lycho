@@ -10,25 +10,25 @@ import { Logo } from '@/components/ui/Logo'
 import { useSidebar } from '@/components/providers/SidebarContext'
 
 const NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard'               },
-  { icon: Bot,             label: 'Agents',        href: '/dashboard/agents'        },
+  { icon: LayoutDashboard, label: 'Dashboard',    href: '/dashboard'                },
+  { icon: Bot,             label: 'Agents',        href: '/dashboard/agents'         },
   { icon: Wand2,           label: 'Build Agent',   href: '/dashboard/agents/builder' },
-  { icon: MessagesSquare,  label: 'Chat',          href: '/dashboard/chat'          },
-  { icon: MessageSquare,   label: 'Conversations', href: '/dashboard/conversations' },
-  { icon: Zap,             label: 'Nexus',         href: '/dashboard/nexus'         },
-  { icon: Network,         label: 'Syndicate',     href: '/dashboard/syndicate'     },
-  { icon: BarChart2,       label: 'Analytics',     href: '/dashboard/analytics'     },
-  { icon: Eye,             label: 'Observe',       href: '/dashboard/observe'       },
-  { icon: TrendingUp,      label: 'Compete',       href: '/dashboard/compete'       },
-  { icon: Cpu,             label: 'Simulate',      href: '/dashboard/simulate'      },
-  { icon: Palette,         label: 'Studio',        href: '/dashboard/studio'        },
-  { icon: Wrench,          label: 'Skills',        href: '/dashboard/skills'        },
-  { icon: Terminal,        label: 'Dev',           href: '/dashboard/dev'           },
-  { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'   },
-  { icon: BookOpen,        label: 'Knowledge',     href: '/dashboard/knowledge'     },
-  { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'       },
-  { icon: Settings,        label: 'Settings',      href: '/dashboard/settings'      },
-  { icon: Code2,           label: 'API',           href: '/developers'              },
+  { icon: MessagesSquare,  label: 'Chat',          href: '/dashboard/chat'           },
+  { icon: MessageSquare,   label: 'Conversations', href: '/dashboard/conversations'  },
+  { icon: Zap,             label: 'Nexus',         href: '/dashboard/nexus'          },
+  { icon: Network,         label: 'Syndicate',     href: '/dashboard/syndicate'      },
+  { icon: BarChart2,       label: 'Analytics',     href: '/dashboard/analytics'      },
+  { icon: Eye,             label: 'Observe',       href: '/dashboard/observe'        },
+  { icon: TrendingUp,      label: 'Compete',       href: '/dashboard/compete'        },
+  { icon: Cpu,             label: 'Simulate',      href: '/dashboard/simulate'       },
+  { icon: Palette,         label: 'Studio',        href: '/dashboard/studio'         },
+  { icon: Wrench,          label: 'Skills',        href: '/dashboard/skills'         },
+  { icon: Terminal,        label: 'Dev',           href: '/dashboard/dev'            },
+  { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'    },
+  { icon: BookOpen,        label: 'Knowledge',     href: '/dashboard/knowledge'      },
+  { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'        },
+  { icon: Settings,        label: 'Settings',      href: '/dashboard/settings'       },
+  { icon: Code2,           label: 'API',           href: '/developers'               },
 ]
 
 export function DashboardSidebar() {
@@ -40,9 +40,10 @@ export function DashboardSidebar() {
       ? pathname === '/dashboard'
       : pathname.startsWith(href)
 
+  const worldActive = pathname.startsWith('/dashboard/world')
+
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/60 lg:hidden"
@@ -61,6 +62,28 @@ export function DashboardSidebar() {
         {/* Logo */}
         <div className="px-6 py-6 shrink-0">
           <Logo size="md" />
+        </div>
+
+        {/* LYCHO WORLD — featured entry */}
+        <div className="px-3 pb-2 shrink-0">
+          <Link
+            href="/dashboard/world"
+            onClick={close}
+            className="flex items-center gap-3 rounded text-sm font-sans w-full"
+            style={{
+              color: '#C9A84C',
+              background: worldActive ? 'rgba(201,168,76,0.1)' : 'rgba(201,168,76,0.05)',
+              borderLeft: worldActive ? '2px solid #C9A84C' : '2px solid rgba(201,168,76,0.3)',
+              padding: '10px 10px',
+              fontWeight: 700,
+              letterSpacing: 1,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(201,168,76,0.12)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = worldActive ? 'rgba(201,168,76,0.1)' : 'rgba(201,168,76,0.05)' }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>✦</span>
+            <span>WORLD</span>
+          </Link>
         </div>
 
         <div style={{ height: '1px', background: '#2a2a2a', margin: '0 24px' }} />
