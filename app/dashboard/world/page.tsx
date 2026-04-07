@@ -148,7 +148,7 @@ export default function WorldPage() {
   const visitorsRef= useRef<Visitor[]>([])
   const partsRef   = useRef<Particle[]>([])
   const mapRef     = useRef<number[][]>(generateMap())
-  const camRef     = useRef({x:0,y:0})
+  const camRef     = useRef({x:0,y:0,scale:1})
   const timeRef    = useRef(0)
   // mutable refs read by rAF loop — changed by UI without restarting loop
   const selRef     = useRef<string|null>(null)
@@ -263,16 +263,16 @@ export default function WorldPage() {
       if(t>0.3&&t<0.75){const p=(t-0.3)/0.45;sR=Math.floor(50+p*107);sG=Math.floor(30+p*77);sB=Math.floor(80+p*20-p*50)}
       ctx.fillStyle=`rgb(${sR},${sG},${sB})`;ctx.fillRect(0,0,W,H)
 
-      const camX=Math.max(0,Math.min(MW*TS-W,MW*TS/2-W/2))
-      const camY=Math.max(0,Math.min(MH*TS-H,MH*TS/2-H/2))
-      camRef.current={x:camX,y:camY}
-      ctx.save();ctx.translate(-camX,-camY)
+      // scale entire world to fit canvas — nothing ever cut off
+      const worldW=MW*TS, worldH=MH*TS
+      const scale=Math.min(W/worldW, H/worldH)
+      const offX=(W-worldW*scale)/2, offY=(H-worldH*scale)/2
+      camRef.current={x:offX, y:offY, scale}
+      ctx.save();ctx.translate(offX,offY);ctx.scale(scale,scale)
 
-      // tiles
+      // tiles — draw entire map (no culling needed at this scale)
       const map=mapRef.current
-      const sX=Math.floor(camX/TS),eX=Math.min(MW,Math.ceil((camX+W)/TS)+1)
-      const sY=Math.floor(camY/TS),eY=Math.min(MH,Math.ceil((camY+H)/TS)+1)
-      for(let ty=sY;ty<eY;ty++) for(let tx=sX;tx<eX;tx++) drawTile(ctx,map[ty][tx],tx,ty,t)
+      for(let ty=0;ty<MH;ty++) for(let tx=0;tx<MW;tx++) drawTile(ctx,map[ty][tx],tx,ty,t)
 
       // buildings
       Object.entries(BP).forEach(([id,bp])=>{
@@ -354,7 +354,7 @@ export default function WorldPage() {
       // night overlay
       if(t<0.3||t>0.75){
         const na=Math.min(0.5,t<0.3?(0.3-t)/0.1*0.5:(t-0.75)/0.1*0.5)
-        ctx.fillStyle=`rgba(0,0,20,${na})`;ctx.fillRect(camX,camY,W,H)
+        ctx.fillStyle=`rgba(0,0,20,${na})`;ctx.fillRect(0,0,worldW,worldH)
       }
       ctx.restore()
     }
@@ -382,7 +382,8 @@ export default function WorldPage() {
 
     function onClick(e:MouseEvent){
       const rect=canvas.getBoundingClientRect()
-      const mx=e.clientX-rect.left+camRef.current.x,my=e.clientY-rect.top+camRef.current.y
+      const mx=(e.clientX-rect.left-camRef.current.x)/camRef.current.scale
+      const my=(e.clientY-rect.top-camRef.current.y)/camRef.current.scale
       const hit=Object.values(agentsRef.current).find(a=>Math.hypot(mx-a.x,my-a.y)<20)
       selRef.current=hit?.id===selRef.current?null:(hit?.id||null)
       if(hit){hit.state='celebrating';spawn(hit.x,hit.y-20,AGENT_DEFS[hit.id]?.shirtColor||'#fff',6)}
