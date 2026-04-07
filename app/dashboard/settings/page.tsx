@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  User, Users, Puzzle, Bell, Code2,
+  User, Users, Puzzle, Bell, Code2, Shield,
   UserPlus, Trash2, ChevronDown, Search,
   Send, MessageCircle, CheckCircle2, Copy,
 } from 'lucide-react'
@@ -39,7 +39,7 @@ interface TeamMember {
   created_at: string
 }
 
-type Tab = 'profile' | 'team' | 'integrations' | 'notifications' | 'developer'
+type Tab = 'profile' | 'team' | 'integrations' | 'notifications' | 'developer' | 'data'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1064,6 +1064,47 @@ function DeveloperTab() {
   )
 }
 
+// ─── Tab: Data & Privacy ─────────────────────────────────────────────────────
+
+function DataPrivacyTab() {
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="rounded-xl p-5" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <h3 className="text-base font-sans font-semibold mb-2" style={{ color: '#F0EBE1' }}>Your Data. Your Rights.</h3>
+        <p className="text-sm font-sans" style={{ color: '#6b6b6b', lineHeight: 1.7 }}>
+          You own 100% of your data on LYCHO. Your conversations, knowledge base, agent configurations and contact memories are yours.
+          We never share your data with other clients. You can export or delete everything at any time.
+        </p>
+      </div>
+
+      <div className="rounded-xl p-5" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <h3 className="text-base font-sans font-semibold mb-1" style={{ color: '#F0EBE1' }}>Export All Data</h3>
+        <p className="text-sm font-sans mb-4" style={{ color: '#6b6b6b' }}>
+          Download everything — agents, conversations, knowledge base, memories, automations.
+        </p>
+        <a
+          href="/api/export"
+          download
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-sans font-medium transition-opacity hover:opacity-80"
+          style={{ background: '#C9A84C', color: '#070707' }}
+        >
+          Download Full Export
+        </a>
+      </div>
+
+      <div className="rounded-xl p-5" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <h3 className="text-base font-sans font-semibold mb-2" style={{ color: '#F0EBE1' }}>Data Retention</h3>
+        <div className="text-sm font-sans space-y-1" style={{ color: '#6b6b6b', lineHeight: 1.7 }}>
+          <p>Conversations: Kept forever by default.</p>
+          <p>Knowledge base: Kept until you delete it.</p>
+          <p>Contact memories: Kept forever to improve agent performance.</p>
+          <p>On account deletion: All data permanently erased within 30 days.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -1072,6 +1113,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'integrations',  label: 'Integrations',      icon: <Puzzle size={15} /> },
   { key: 'notifications', label: 'Notifications',     icon: <Bell size={15} /> },
   { key: 'developer',     label: 'Developer',         icon: <Code2 size={15} /> },
+  { key: 'data',          label: 'Data & Privacy',    icon: <Shield size={15} /> },
 ]
 
 export default function SettingsPage() {
@@ -1132,6 +1174,7 @@ export default function SettingsPage() {
           {activeTab === 'integrations'  && <IntegrationsTab tenantId={tenantId} />}
           {activeTab === 'notifications' && <NotificationsTab />}
           {activeTab === 'developer'     && <DeveloperTab />}
+          {activeTab === 'data'          && <DataPrivacyTab />}
 
           {/* Danger Zone — always visible */}
           <DangerZone />

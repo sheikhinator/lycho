@@ -10,6 +10,7 @@ import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
 import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
 import { retrieveMemories, extractMemories } from '@/lib/memory/memory-graph'
+import { buildPersonaPrompt } from '@/lib/persona/persona-engine'
 import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 import { createNotification } from '@/lib/notifications/notification-service'
@@ -288,6 +289,11 @@ export async function POST(req: NextRequest) {
         if (!complexity.needsCouncil || complexity.suggestedAgents.length <= 1) {
           let orionPrompt = basePrompt
           try { orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt) } catch {}
+
+          // Persona injection (LYCHO Persona)
+          let personaPrefix = ''
+          try { personaPrefix = await buildPersonaPrompt(agent.agent_type as string) } catch {}
+          if (personaPrefix) orionPrompt = `${personaPrefix}\n\n${orionPrompt}`
 
           // RAG: inject knowledge context
           let knowledgeContext = ''
