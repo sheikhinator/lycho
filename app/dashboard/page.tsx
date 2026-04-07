@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
+import { InsightCard } from '@/components/dashboard/InsightCard'
 import { Button } from '@/components/ui'
 import type { Tenant } from '@/lib/database.types'
 
@@ -201,6 +202,8 @@ export default async function DashboardPage() {
             </p>
             <h1 className="font-bebas text-4xl tracking-[0.15em]" style={{ color: '#C9A84C' }}>Dashboard</h1>
           </div>
+
+          <InsightCard />
 
           {/* KPI Row — 1 col mobile, 2 tablet, 4 desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
