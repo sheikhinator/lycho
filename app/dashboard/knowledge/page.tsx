@@ -21,6 +21,7 @@ export default function KnowledgePage() {
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', content: '', source_type: 'upload' as 'upload' | 'url', source_url: '' })
+  const [successMsg, setSuccessMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchDocs() }, [])
@@ -45,14 +46,17 @@ export default function KnowledgePage() {
     if (!form.name.trim() || !form.content.trim()) return
     setUploading(true)
     try {
-      await fetch('/api/knowledge', {
+      const res = await fetch('/api/knowledge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
+      if (!res.ok) throw new Error('Upload failed')
       setForm({ name: '', content: '', source_type: 'upload', source_url: '' })
       setShowForm(false)
-      fetchDocs()
+      setSuccessMsg('Document uploaded successfully')
+      setTimeout(() => setSuccessMsg(''), 4000)
+      await fetchDocs()
     } catch {}
     setUploading(false)
   }
@@ -176,6 +180,13 @@ export default function KnowledgePage() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Success message */}
+          {successMsg && (
+            <div className="mb-4 px-4 py-3 rounded-lg text-sm font-sans" style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C' }}>
+              {successMsg}
             </div>
           )}
 
