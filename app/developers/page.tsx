@@ -338,6 +338,42 @@ export default function DevelopersPage() {
           </div>
         </section>
 
+        {/* ── MCP Server ──────────────────────────────────────────────────────── */}
+        <section className="space-y-6">
+          <div>
+            <p className="text-xs font-sans uppercase tracking-[0.3em] mb-2" style={{ color: '#7a6130' }}>MCP</p>
+            <h2 className="font-bebas text-3xl tracking-[0.15em]" style={{ color: '#F0EBE1' }}>Connect to Claude Code</h2>
+          </div>
+          <p className="text-sm font-sans" style={{ color: '#6b6b6b', lineHeight: '1.7' }}>
+            LYCHO exposes a full MCP server. Add it to your Claude Code config and get access to 370+ specialist agents directly inside Claude Code.
+          </p>
+          <CodeBlock lang="json" code={`{
+  "mcpServers": {
+    "lycho": {
+      "url": "${APP_URL}/api/mcp",
+      "apiKey": "YOUR_LYCHO_API_KEY"
+    }
+  }
+}`} />
+          <p className="text-sm font-sans font-semibold mt-2" style={{ color: '#F0EBE1' }}>Available tools</p>
+          <div className="space-y-2">
+            {[
+              { name: 'lycho_research', desc: 'Deep research with live web search' },
+              { name: 'lycho_comply',   desc: 'Compliance & legal checks for any country' },
+              { name: 'lycho_ask',      desc: 'Route to any of 370+ specialist agents via agent_type' },
+            ].map(t => (
+              <div key={t.name} className="flex items-start gap-3 px-4 py-3 rounded-lg" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+                <code className="text-xs font-mono shrink-0 mt-0.5" style={{ color: '#C9A84C' }}>{t.name}</code>
+                <span className="text-xs font-sans" style={{ color: '#6b6b6b' }}>{t.desc}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs font-sans" style={{ color: '#6b6b6b' }}>
+            Get your API key in{' '}
+            <Link href="/dashboard/settings" style={{ color: '#C9A84C' }}>Dashboard → Settings → Developer</Link>.
+          </p>
+        </section>
+
         {/* ── Widget Embed ────────────────────────────────────────────────────── */}
         <section className="space-y-6">
           <div>

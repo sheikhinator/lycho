@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  User, Users, Puzzle, Bell,
+  User, Users, Puzzle, Bell, Code2,
   UserPlus, Trash2, ChevronDown, Search,
   Send, MessageCircle, CheckCircle2, Copy,
 } from 'lucide-react'
@@ -39,7 +39,7 @@ interface TeamMember {
   created_at: string
 }
 
-type Tab = 'profile' | 'team' | 'integrations' | 'notifications'
+type Tab = 'profile' | 'team' | 'integrations' | 'notifications' | 'developer'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -997,6 +997,73 @@ function DangerZone() {
   )
 }
 
+// ─── Tab: Developer ──────────────────────────────────────────────────────────
+
+function DeveloperTab() {
+  const { toast } = useToast()
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/tenants/api-key')
+      .then(r => r.json())
+      .then(j => { setApiKey(j.data?.api_key ?? null); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  function copy() {
+    if (!apiKey) return
+    navigator.clipboard.writeText(apiKey)
+    toast('API key copied', 'success')
+  }
+
+  return (
+    <div className="space-y-8 max-w-2xl">
+      <div>
+        <h2 className="font-bebas text-2xl tracking-wider mb-1" style={{ color: '#F0EBE1' }}>Developer API Key</h2>
+        <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>Use this key to connect LYCHO agents to Claude Code via MCP or call the API directly.</p>
+      </div>
+
+      <div className="rounded-xl p-5 space-y-4" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <p className="text-xs font-sans uppercase tracking-widest" style={{ color: '#6b6b6b' }}>API Key</p>
+        {loading ? (
+          <div className="h-10 rounded" style={{ background: '#1c1c1c' }} />
+        ) : apiKey ? (
+          <div className="flex items-center gap-2">
+            <code className="flex-1 px-3 py-2.5 rounded text-xs font-mono truncate" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', color: '#C9A84C' }}>
+              {apiKey}
+            </code>
+            <button
+              onClick={copy}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded text-xs font-sans transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', color: '#C9A84C' }}
+            >
+              <Copy size={12} /> Copy
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>API key not found — run the Supabase migration to generate one.</p>
+        )}
+      </div>
+
+      <div className="rounded-xl p-5 space-y-3" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <p className="text-xs font-sans uppercase tracking-widest mb-3" style={{ color: '#6b6b6b' }}>Connect to Claude Code (MCP)</p>
+        <pre className="text-xs font-mono p-4 rounded overflow-x-auto" style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', color: '#F0EBE1' }}>{`{
+  "mcpServers": {
+    "lycho": {
+      "url": "https://lycho.vercel.app/api/mcp",
+      "apiKey": "${apiKey ?? 'YOUR_LYCHO_API_KEY'}"
+    }
+  }
+}`}</pre>
+        <a href="/developers" className="inline-block text-xs font-sans mt-2" style={{ color: '#C9A84C' }}>
+          Full MCP documentation →
+        </a>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -1004,6 +1071,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'team',          label: 'Team',              icon: <Users size={15} /> },
   { key: 'integrations',  label: 'Integrations',      icon: <Puzzle size={15} /> },
   { key: 'notifications', label: 'Notifications',     icon: <Bell size={15} /> },
+  { key: 'developer',     label: 'Developer',         icon: <Code2 size={15} /> },
 ]
 
 export default function SettingsPage() {
@@ -1063,6 +1131,7 @@ export default function SettingsPage() {
           {activeTab === 'team'          && <TeamTab />}
           {activeTab === 'integrations'  && <IntegrationsTab tenantId={tenantId} />}
           {activeTab === 'notifications' && <NotificationsTab />}
+          {activeTab === 'developer'     && <DeveloperTab />}
 
           {/* Danger Zone — always visible */}
           <DangerZone />
