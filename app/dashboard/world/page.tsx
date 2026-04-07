@@ -108,6 +108,7 @@ export default function WorldPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentNode | null>(null)
   const [worldMood, setWorldMood] = useState<'peaceful' | 'active' | 'alert'>('peaceful')
   const [showLegend, setShowLegend] = useState(true)
+  const frameCountRef = useRef(0)
 
   function spawnParticle(fromNode: AgentNode, toId: string, type: Particle['type'] = 'message') {
     const toNode = nodesRef.current.find(n => n.id === toId)
@@ -281,12 +282,16 @@ export default function WorldPage() {
     })
     eventsRef.current = eventsRef.current.filter(ev => ev.opacity > 0)
 
-    setStats({ agents: nodes.length })
-    const alertCount = nodes.filter(n => n.state==='alert').length
-    const activeCount = nodes.filter(n => n.state!=='idle' && n.state!=='sleeping').length
-    if (alertCount>2) setWorldMood('alert')
-    else if (activeCount>4) setWorldMood('active')
-    else setWorldMood('peaceful')
+    // Throttle React state updates to once per second (avoid re-render on every frame)
+    frameCountRef.current++
+    if (frameCountRef.current % 60 === 0) {
+      setStats({ agents: nodes.length })
+      const alertCount = nodes.filter(n => n.state==='alert').length
+      const activeCount = nodes.filter(n => n.state!=='idle' && n.state!=='sleeping').length
+      if (alertCount>2) setWorldMood('alert')
+      else if (activeCount>4) setWorldMood('active')
+      else setWorldMood('peaceful')
+    }
 
     animFrameRef.current = requestAnimationFrame(render)
   }, [])

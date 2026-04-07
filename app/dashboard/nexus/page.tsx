@@ -958,6 +958,11 @@ export default function NexusPage() {
               <p className="text-sm font-sans mt-2" style={{ color: '#6b6b6b' }}>Automate everything. Connect anywhere.</p>
             </div>
             <div className="flex gap-2 shrink-0">
+              <Link href="/dashboard/nexus/canvas">
+                <Button variant="ghost" className="gap-2" style={{ color: '#6b6b6b', border: '1px solid #2a2a2a' }}>
+                  Visual Canvas
+                </Button>
+              </Link>
               <Link href="/dashboard/nexus/builder">
                 <Button variant="ghost" className="gap-2" style={{ color: '#C9A84C', border: '1px solid rgba(201,168,76,0.4)' }}>
                   <Wand2 size={14} /> Build with AI
