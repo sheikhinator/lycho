@@ -32,6 +32,7 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying]     = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [micError, setMicError]         = useState('')
   const bottomRef  = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -78,7 +79,25 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   }
 
   async function startRecording() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    setMicError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError('Microphone not supported — use HTTPS or a modern browser')
+      return
+    }
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('denied') || msg.includes('Permission')) {
+        setMicError('Microphone access denied — allow it in browser settings')
+      } else {
+        setMicError('Could not access microphone')
+      }
+      setTimeout(() => setMicError(''), 5000)
+      return
+    }
+
     const mediaRecorder = new MediaRecorder(stream)
     mediaRecorderRef.current = mediaRecorder
     audioChunksRef.current = []
@@ -104,7 +123,9 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   }
 
   function stopRecording() {
-    mediaRecorderRef.current?.stop()
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop()
+    }
     setIsRecording(false)
   }
 
@@ -375,23 +396,22 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
 
             {/* Voice toggle */}
             <button
+              type="button"
               onClick={() => setVoiceEnabled(v => !v)}
               className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all mb-0.5"
               style={{ background: voiceEnabled ? 'rgba(201,168,76,0.15)' : 'transparent', border: `1px solid ${voiceEnabled ? 'rgba(201,168,76,0.4)' : '#2a2a2a'}`, color: voiceEnabled ? '#C9A84C' : '#6b6b6b' }}
-              title="Toggle voice mode"
+              title={voiceEnabled ? 'Voice on — click to disable' : 'Enable voice mode'}
             >
               {isPlaying ? <Loader2 size={14} className="animate-spin" /> : <Volume2 size={14} />}
             </button>
 
-            {/* Mic — hold to record */}
+            {/* Mic — click to start, click again to stop */}
             <button
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
               className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all mb-0.5"
               style={{ background: isRecording ? '#ef4444' : 'transparent', border: `1px solid ${isRecording ? '#ef4444' : '#2a2a2a'}`, color: isRecording ? '#fff' : '#6b6b6b' }}
-              title="Hold to speak"
+              title={isRecording ? 'Stop recording' : 'Click to speak'}
             >
               <Mic size={14} />
             </button>
@@ -405,9 +425,12 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
               }
             </button>
           </div>
-          <p className="text-center mt-2 text-[10px] font-sans" style={{ color: '#444' }}>
-            Images · PDFs · TXT · CSV · JSON — max {MAX_FILE_MB}MB each
-          </p>
+          {micError
+            ? <p className="text-center mt-2 text-[10px] font-sans" style={{ color: '#ef4444' }}>{micError}</p>
+            : <p className="text-center mt-2 text-[10px] font-sans" style={{ color: '#444' }}>
+                Images · PDFs · TXT · CSV · JSON — max {MAX_FILE_MB}MB each
+              </p>
+          }
         </div>
       </div>
     </div>
