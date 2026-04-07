@@ -39,6 +39,8 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef   = useRef<Blob[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef   = useRef<any>(null)
 
   // Scroll to bottom on new message
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -79,56 +81,51 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
     })
   }
 
-  async function startRecording() {
+  function startRecording() {
     setMicError('')
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setMicError('Microphone not supported — requires HTTPS and a modern browser')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) {
+      setMicError('Live transcription not supported in this browser — use Chrome')
+      setTimeout(() => setMicError(''), 5000)
       return
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
+    const recognition = new SR()
+    recognition.continuous     = true
+    recognition.interimResults = true
+    recognition.lang           = 'en-US'
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+    recognition.onresult = (e: { results: SpeechRecognitionResultList }) => {
+      let transcript = ''
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript
       }
+      setInput(transcript)
+    }
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const formData = new FormData()
-        formData.append('audio', audioBlob)
-        try {
-          const res = await fetch('/api/voice/transcribe', { method: 'POST', body: formData })
-          const { transcript } = await res.json()
-          if (transcript) setInput(transcript)
-        } catch {}
-        stream.getTracks().forEach(t => t.stop())
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch (e: unknown) {
-      const name = e instanceof DOMException ? e.name : ''
-      const msg  = e instanceof Error ? e.message : String(e)
-      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setMicError('Microphone blocked — click the lock icon in your browser address bar and allow microphone')
-      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-        setMicError('Microphone is in use by another app — close it and try again')
-      } else if (name === 'NotFoundError') {
-        setMicError('No microphone found — plug one in and try again')
+    recognition.onerror = (e: { error: string }) => {
+      if (e.error === 'not-allowed') {
+        setMicError('Microphone blocked — allow it in browser site settings')
+      } else if (e.error === 'audio-capture') {
+        setMicError('No microphone found')
       } else {
-        setMicError(`Microphone error: ${name || msg}`)
+        setMicError(`Microphone error: ${e.error}`)
       }
       setTimeout(() => setMicError(''), 6000)
+      setIsRecording(false)
     }
+
+    recognition.onend = () => setIsRecording(false)
+
+    recognition.start()
+    recognitionRef.current = recognition
+    setIsRecording(true)
   }
 
   function stopRecording() {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop()
-    }
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
     setIsRecording(false)
   }
 
