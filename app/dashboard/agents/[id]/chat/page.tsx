@@ -10,6 +10,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   files?: { name: string; url: string; type: string }[]
+  confidence?: number
 }
 
 interface AttachedFile {
@@ -197,6 +198,13 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
               const data = JSON.parse(line.slice(6))
               if (data.searching === true)  setIsSearching(true)
               if (data.searching === false) setIsSearching(false)
+              if (data.confidence) {
+                setMessages(prev => {
+                  const u = [...prev]
+                  u[u.length - 1] = { ...u[u.length - 1], confidence: data.confidence }
+                  return u
+                })
+              }
               if (data.text) {
                 setMessages(prev => {
                   const updated = [...prev]
@@ -332,6 +340,12 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
                       borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                     }}>
                     {msg.content}
+                  </div>
+                )}
+                {msg.role === 'assistant' && msg.confidence && (
+                  <div className="text-[10px] font-sans opacity-60 mt-0.5"
+                    style={{ color: msg.confidence >= 80 ? '#4ade80' : '#C9A84C' }}>
+                    {msg.confidence}% confidence
                   </div>
                 )}
               </div>

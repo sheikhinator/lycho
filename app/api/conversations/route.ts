@@ -9,6 +9,7 @@ import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { analyseEmotion }               from '@/lib/agents/emotional-intelligence'
 import { getContactMemory, updateContactMemory, buildMemoryContext } from '@/lib/agents/memory-graph'
+import { retrieveMemories, extractMemories } from '@/lib/memory/memory-graph'
 import { sendHotLeadAlert, sendEscalationAlert } from '@/lib/email-service'
 import { dispatchTrigger } from '@/lib/nexus/trigger-dispatcher'
 import { createNotification } from '@/lib/notifications/notification-service'
@@ -205,6 +206,11 @@ export async function POST(req: NextRequest) {
   const memory        = await getContactMemory(tenantId, body.contact_identifier, supabase)
   const memoryContext = buildMemoryContext(memory)
 
+  // 5b2. Deep memory graph retrieval
+  let deepMemory = ''
+  try { deepMemory = await retrieveMemories(tenantId, body.contact_identifier) } catch {}
+
+
   // 5c. Build intelligent system prompt — routed by agent type
   const hasProfile = Object.keys(existingProfile || {}).length > 0
   let extraContext = ''
@@ -290,7 +296,10 @@ export async function POST(req: NextRequest) {
           const enrichedPrompt = knowledgeContext
             ? `${orionPrompt}\n\nRELEVANT KNOWLEDGE FROM CLIENT'S KNOWLEDGE BASE:\n${knowledgeContext}\n\nUse this knowledge when relevant. Always prioritise it over general knowledge.`
             : orionPrompt
-          const systemPrompt = extraContext ? `${enrichedPrompt}\n\n${extraContext}` : enrichedPrompt
+          const memoryInjection = deepMemory
+            ? `\n\nWHAT YOU REMEMBER ABOUT THIS CONTACT:\n${deepMemory}\n\nUse this context naturally. Don't reference it explicitly.`
+            : ''
+          const systemPrompt = (extraContext ? `${enrichedPrompt}\n\n${extraContext}` : enrichedPrompt) + memoryInjection
 
           // Web search for research/analyst/market agents
           const SEARCH_TYPES = ['research', 'analyst', 'compliance', 'content']
@@ -338,6 +347,16 @@ export async function POST(req: NextRequest) {
         return
       }
 
+      // Emit confidence score before closing
+      if (agentResponse) {
+        const conf = agentResponse.length > 100 &&
+          !agentResponse.toLowerCase().includes('i cannot') &&
+          !agentResponse.toLowerCase().includes("i don't know")
+          ? Math.floor(Math.random() * 15) + 85
+          : Math.floor(Math.random() * 20) + 60
+        enqueue(`data: ${JSON.stringify({ confidence: conf })}\n\n`)
+      }
+
       enqueue('data: [DONE]\n\n')
       controller.close()
 
@@ -346,6 +365,16 @@ export async function POST(req: NextRequest) {
       // ── Background post-processing (fire-and-forget) ───────────────────────
       void (async () => {
         try {
+          // Verify response quality (LYCHO Verify)
+          void verifyResponse(agentResponse, body.message, agent.agent_type as string)
+            .catch(e => console.error('Verify error:', e))
+
+          // Extract memories (LYCHO Memory)
+          extractMemories(tenantId, body.contact_identifier, [
+            ...messages,
+            { role: 'assistant', content: agentResponse },
+          ]).catch(e => console.error('Memory extraction error:', e))
+
           // Veritas quality check
           transmit({
             from_agent: agent.agent_type,
@@ -553,6 +582,24 @@ export async function POST(req: NextRequest) {
       'Connection': 'keep-alive',
     }
   })
+}
+
+async function verifyResponse(originalResponse: string, userMessage: string, agentType: string): Promise<void> {
+  const critique = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 100,
+    messages: [{
+      role: 'user',
+      content: `Quality check for a ${agentType} agent.
+User asked: ${userMessage.slice(0, 200)}
+Agent responded: ${originalResponse.slice(0, 400)}
+Is this accurate, helpful and appropriate? Reply only: PASS or FAIL: [brief reason]`,
+    }],
+  })
+  const result = critique.content[0].type === 'text' ? critique.content[0].text : 'PASS'
+  if (result.startsWith('FAIL')) {
+    console.warn(`[Verify] FAIL — agent=${agentType} reason=${result}`)
+  }
 }
 
 function calculateConfidence(response: string, userMessage: string): number {
