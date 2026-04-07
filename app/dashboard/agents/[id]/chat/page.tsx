@@ -29,6 +29,7 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
   const [agentName, setAgentName]   = useState('Agent')
   const [planError, setPlanError]   = useState(false)
   const [agentError, setAgentError] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying]     = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(false)
@@ -195,6 +196,8 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
           if (line.startsWith('data: ') && line !== 'data: [DONE]') {
             try {
               const data = JSON.parse(line.slice(6))
+              if (data.searching === true)  setIsSearching(true)
+              if (data.searching === false) setIsSearching(false)
               if (data.text) {
                 setMessages(prev => {
                   const updated = [...prev]
@@ -350,6 +353,14 @@ export default function AgentChatPage({ params }: { params: Promise<{ id: string
 
           <div ref={bottomRef} />
         </div>
+
+        {/* Web search indicator */}
+        {isSearching && (
+          <div className="px-4 lg:px-6 py-2 flex items-center gap-2 text-xs font-sans" style={{ color: '#C9A84C' }}>
+            <span className="animate-spin inline-block" style={{ fontSize: 14 }}>⟳</span>
+            Searching the web…
+          </div>
+        )}
 
         {/* File previews */}
         {files.length > 0 && (

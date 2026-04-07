@@ -292,21 +292,40 @@ export async function POST(req: NextRequest) {
             : orionPrompt
           const systemPrompt = extraContext ? `${enrichedPrompt}\n\n${extraContext}` : enrichedPrompt
 
+          // Web search for research/analyst/market agents
+          const SEARCH_TYPES = ['research', 'analyst', 'compliance', 'content']
+          const agentT = agent.agent_type as string
+          const shouldSearch = SEARCH_TYPES.includes(agentT) ||
+            agentT.includes('research') || agentT.includes('market') || agentT.includes('competitor')
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tools: any[] | undefined = shouldSearch
+            ? [{ type: 'web_search_20250305', name: 'web_search' }]
+            : undefined
+
           const stream = anthropic.messages.stream({
             model,
             max_tokens: maxTokens,
             system: systemPrompt,
             messages: messages.slice(-20),
+            ...(tools && { tools }),
           })
 
           const chunks: string[] = []
           for await (const chunk of stream) {
+            if (chunk.type === 'content_block_start') {
+              if ((chunk.content_block as { type: string }).type === 'tool_use') {
+                enqueue(`data: ${JSON.stringify({ searching: true })}\n\n`)
+              }
+            }
             if (chunk.type === 'content_block_delta') {
               const delta = chunk.delta
               if (delta.type === 'text_delta') {
                 chunks.push(delta.text)
                 enqueue(`data: ${JSON.stringify({ text: delta.text })}\n\n`)
               }
+            }
+            if (chunk.type === 'content_block_stop') {
+              enqueue(`data: ${JSON.stringify({ searching: false })}\n\n`)
             }
           }
           agentResponse = chunks.join('')
