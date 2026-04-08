@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -24,6 +24,17 @@ export default function CanvasPage() {
   const [saved, setSaved]             = useState(false)
   const canvasRef                     = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    fetch('/api/nexus/canvas')
+      .then(r => r.json())
+      .then(d => {
+        if (d.workflow) {
+          setNodes(d.workflow.nodes ?? [])
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   function add(type: NodeType) {
     setNodes(p => [...p, { id: `n_${Date.now()}`, type, label: TYPES.find(t => t.type === type)!.label, x: 220 + Math.random() * 180, y: 120 + Math.random() * 160 }])
   }
@@ -41,8 +52,12 @@ export default function CanvasPage() {
     setNodes(p => p.map(n => n.id === dragging ? { ...n, x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y } : n))
   }
 
-  function save() {
-    localStorage.setItem('lycho_canvas', JSON.stringify({ nodes, connections }))
+  async function save() {
+    await fetch('/api/nexus/canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes, connections }),
+    })
     setSaved(true); setTimeout(() => setSaved(false), 2000)
   }
 

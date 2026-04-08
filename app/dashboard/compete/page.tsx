@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DashboardTopBar } from '@/components/dashboard/DashboardTopBar'
 import { TrendingUp, Loader2 } from 'lucide-react'
@@ -7,11 +7,20 @@ import { TrendingUp, Loader2 } from 'lucide-react'
 export default function CompetePage() {
   const [brief, setBrief]     = useState('')
   const [loading, setLoading] = useState(false)
+  const [checked, setChecked] = useState(false)
 
-  async function loadBrief() {
+  useEffect(() => {
+    fetch('/api/compete/brief')
+      .then(r => r.json())
+      .then(d => { if (d.brief) setBrief(d.brief) })
+      .catch(() => {})
+      .finally(() => setChecked(true))
+  }, [])
+
+  async function generateBrief() {
     setLoading(true)
     try {
-      const res  = await fetch('/api/compete/brief')
+      const res  = await fetch('/api/compete/brief', { method: 'POST' })
       const data = await res.json()
       setBrief(data.brief || '')
     } catch {}
@@ -33,18 +42,26 @@ export default function CompetePage() {
                 <p className="text-sm font-sans" style={{ color: '#6b6b6b' }}>Real-time competitor intelligence via live web search</p>
               </div>
             </div>
-            <button
-              onClick={loadBrief}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-sans font-medium transition-opacity hover:opacity-80"
-              style={{ background: loading ? '#2a2a2a' : '#C9A84C', color: loading ? '#6b6b6b' : '#070707' }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
-              {loading ? 'Researching…' : 'Generate Brief'}
-            </button>
+            {checked && !brief && (
+              <button
+                onClick={generateBrief}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-sans font-medium transition-opacity hover:opacity-80"
+                style={{ background: loading ? '#2a2a2a' : '#C9A84C', color: loading ? '#6b6b6b' : '#070707' }}
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
+                {loading ? 'Researching…' : 'Generate Brief'}
+              </button>
+            )}
           </div>
 
-          {!brief && !loading && (
+          {!checked && (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 size={20} className="animate-spin" style={{ color: '#C9A84C' }} />
+            </div>
+          )}
+
+          {checked && !brief && !loading && (
             <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl"
               style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
               <TrendingUp size={40} className="mb-4 opacity-20" style={{ color: '#C9A84C' }} />

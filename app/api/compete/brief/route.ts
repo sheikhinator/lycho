@@ -11,7 +11,26 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
+// GET — return cached brief from scout_reports if < 7 days old
 export async function GET() {
+  const ctx = await getAuthContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!ctx.tenantId) return NextResponse.json({ error: 'No tenant' }, { status: 403 })
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data } = await supabaseAdmin
+    .from('scout_reports')
+    .select('competitor_brief, created_at')
+    .eq('id', 'latest')
+    .gte('created_at', sevenDaysAgo)
+    .single()
+
+  return NextResponse.json({ brief: data?.competitor_brief ?? null })
+}
+
+// POST — generate a fresh brief and save it to scout_reports
+export async function POST() {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!ctx.tenantId) return NextResponse.json({ error: 'No tenant' }, { status: 403 })
@@ -26,5 +45,10 @@ export async function GET() {
   const country  = (tenant?.country as string) || 'PK'
 
   const brief = await generateCompetitorBrief(ctx.tenantId, industry, country)
+
+  await supabaseAdmin
+    .from('scout_reports')
+    .upsert({ id: 'latest', competitor_brief: brief, created_at: new Date().toISOString() }, { onConflict: 'id' })
+
   return NextResponse.json({ brief })
 }

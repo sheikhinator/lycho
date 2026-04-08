@@ -59,7 +59,7 @@ export async function detectChurnRisk(): Promise<number> {
 
   for (const convo of atRisk) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sentiment = (c => (c.metadata as any)?.sentiment)(convo)
+    const sentiment = (convo.metadata as any)?.sentiment
     await supabaseAdmin.from('notifications').insert({
       tenant_id: convo.tenant_id,
       type: 'churn_risk',

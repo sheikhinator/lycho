@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { injectIntelligence } from '@/lib/orion/orion-engine'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,7 +97,6 @@ export async function POST(request: Request) {
     else if (tool === 'lycho_ask' && input?.agent_type) agentType = input.agent_type
     else if (typeof tool === 'string' && tool.startsWith('lycho_')) agentType = tool.replace('lycho_', '')
 
-    const { injectIntelligence } = await import('@/lib/orion/orion-engine')
     const systemPrompt = await injectIntelligence(agentType, input?.country || 'PK')
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default

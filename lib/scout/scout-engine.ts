@@ -9,12 +9,15 @@ const supabaseAdmin = createClient(
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// web_search_20250305 is a beta tool not yet typed in the SDK — cast is intentional
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const webSearchTool = { type: 'web_search_20250305', name: 'web_search' } as any
+
 async function scoutWithSearch(prompt: string): Promise<string> {
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 600,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools: [{ type: 'web_search_20250305' as any, name: 'web_search' }] as any[],
+    tools: [webSearchTool],
     messages: [{ role: 'user', content: prompt }]
   })
   return response.content.filter(b => b.type === 'text').map(b => b.type === 'text' ? b.text : '').join('')
