@@ -11,7 +11,7 @@ import { callClaude, getModel } from '@/lib/claude'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
-import { sendCustomerProfileEmail } from '@/lib/email-service'
+import { sendCustomerProfileEmail } from '@/lib/agents/action-executor'
 import { createHmac, timingSafeEqual } from 'crypto'
 
 // ─── Signature verification ────────────────────────────────────────────────────
