@@ -11,7 +11,6 @@ import { callClaude, getModel } from '@/lib/claude'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
-import { sendCustomerProfileEmail } from '@/lib/agents/action-executor'
 import { createHmac, timingSafeEqual } from 'crypto'
 
 // ─── Signature verification ────────────────────────────────────────────────────
@@ -223,38 +222,6 @@ export async function POST(request: Request) {
         String(creds.phone_number_id),
         String(creds.access_token),
       )
-    }
-
-      // Email the business owner with customer profile + queries
-    try {
-      const ownerEmail = tenant.owner_email || 'zulfi@lycho.ai' // fallback to your email
-      const allMessages = [...messages, { role: 'assistant' as const, content: cleanResponse }]
-      const customerQueries = allMessages
-        .filter(m => m.role === 'user')
-        .map(m => m.content)
-
-      const { Resend } = await import('resend')
-      const resend = new Resend(process.env.RESEND_API_KEY)
-
-      await resend.emails.send({
-        from: 'LYCHO <alerts@lycho.ai>',
-        to: ownerEmail,
-        subject: `New WhatsApp Query — ${conversation.metadata?.contact_profile?.name || contact?.profile?.name || 'Unknown'}`,
-        html: `
-          <h2>New Customer Query via WhatsApp</h2>
-          <p><strong>Customer:</strong> ${conversation.metadata?.contact_profile?.name || contact?.profile?.name || 'Unknown'}</p>
-          <p><strong>Contact:</strong> ${inbound.contactIdentifier}</p>
-          <p><strong>Sentiment:</strong> ${metadata?.sentiment ?? emotion.state ?? 'neutral'}</p>
-          <p><strong>Lead Score:</strong> ${leadScore}/100</p>
-          <h3>Profile Details</h3>
-          <pre>${JSON.stringify(conversation.metadata?.contact_profile || {}, null, 2)}</pre>
-          <h3>Queries</h3>
-          <ul>${customerQueries.map((q: string) => `<li>${q}</li>`).join('')}</ul>
-          <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/conversations/${conversation.id}">View Full Conversation</a></p>
-        `,
-      })
-    } catch (emailError) {
-      console.error('Failed to send customer profile email:', emailError)
     }
   } catch {
     // Errors are non-fatal — response is returned below
