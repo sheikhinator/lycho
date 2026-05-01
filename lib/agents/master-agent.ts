@@ -32,13 +32,13 @@ export async function orchestrateResponse({
   emotion,
   memoryContext,
 }: {
-  tenant: any
-  agent: any
-  conversation: any
-  message: string
-  contactProfile: any
-  emotion: any
-  memoryContext: string
+  tenant: any;
+  agent: any;
+  conversation: any;
+  message: string;
+  contactProfile: any;
+  emotion: any;
+  memoryContext: string;
 }): Promise<OrchestrationResult> {
   const systemPrompt = buildMasterOrchestratorPrompt(tenant, agent, contactProfile)
   const model = getModel('complex') // Use smarter model for orchestration
