@@ -304,12 +304,7 @@ export async function POST(req: NextRequest) {
             modelUsed = 'master-orchestrator'
 
             // Stream the response
-            const words = agentResponse.split(' ')
-            for (const word of words) {
-              enqueue(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`)
-              // Small delay for streaming effect
-              await new Promise(r => setTimeout(r, 20))
-            }
+            enqueue(`data: ${JSON.stringify({ text: agentResponse })}\n\n`)
 
             // Log actions executed
             if (orchestration.actions_executed.length > 0) {
