@@ -980,9 +980,12 @@ export async function POST(req: NextRequest) {
 
       for (const toolCall of toolCalls) {
         try {
+          // Handle both tool call formats (function property may not exist on custom tool calls)
+          const toolName = (toolCall as any).function?.name || (toolCall as any).name || ''
+          const toolArgs = (toolCall as any).function?.arguments || (toolCall as any).arguments || '{}'
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const result = await executor(toolCall.function.name, JSON.parse(toolCall.function.arguments))
-          toolResults.push(`[${toolCall.function.name}]: ${result}`)
+          const result = await executor(toolName, JSON.parse(toolArgs))
+          toolResults.push(`[${toolName}]: ${result}`)
           toolResultBlocks.push({
             role: 'tool',
             tool_call_id: toolCall.id,
