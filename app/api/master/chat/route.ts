@@ -979,10 +979,11 @@ export async function POST(req: NextRequest) {
       const toolResultBlocks: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
 
       for (const toolCall of toolCalls) {
+        // Define outside try/catch so it's accessible in both blocks
+        const toolName = (toolCall as any).function?.name || (toolCall as any).name || ''
+        const toolArgs = (toolCall as any).function?.arguments || (toolCall as any).arguments || '{}'
+        
         try {
-          // Handle both tool call formats (function property may not exist on custom tool calls)
-          const toolName = (toolCall as any).function?.name || (toolCall as any).name || ''
-          const toolArgs = (toolCall as any).function?.arguments || (toolCall as any).arguments || '{}'
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const result = await executor(toolName, JSON.parse(toolArgs))
           toolResults.push(`[${toolName}]: ${result}`)
