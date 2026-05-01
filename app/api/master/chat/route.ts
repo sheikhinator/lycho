@@ -993,7 +993,7 @@ export async function POST(req: NextRequest) {
           } as OpenAI.Chat.Completions.ChatCompletionMessageParam)
         } catch (toolErr: unknown) {
           const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
-          console.error(`[master/chat] tool ${toolCall.function.name} threw:`, msg)
+          console.error(`[master/chat] tool ${toolName} threw:`, msg)
           toolResultBlocks.push({
             role: 'tool',
             tool_call_id: toolCall.id,
