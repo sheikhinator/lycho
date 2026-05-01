@@ -5,6 +5,7 @@ import { EscalationAlert } from './email-templates/escalation-alert'
 import { DailyDigest } from './email-templates/daily-digest'
 import { TrialExpiry } from './email-templates/trial-expiry'
 import { WeeklyROI } from './email-templates/weekly-roi'
+import { CustomerProfileEmail } from './email-templates/customer-profile'
 import React from 'react'
 
 const resend = new Resend(process.env.RESEND_API_KEY)

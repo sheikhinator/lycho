@@ -11,6 +11,7 @@ import { callClaude, getModel } from '@/lib/claude'
 import { extractProfileFromMetadata } from '@/lib/agents/profile-extractor'
 import { calculateLeadScore, getLeadLabel } from '@/lib/agents/lead-scorer'
 import { buildIntakeSystemPrompt } from '@/lib/agents/intake-agent'
+import { sendCustomerProfileEmail } from '@/lib/email-service'
 import { createHmac, timingSafeEqual } from 'crypto'
 
 // ─── Signature verification ────────────────────────────────────────────────────
@@ -222,6 +223,29 @@ export async function POST(request: Request) {
         String(creds.phone_number_id),
         String(creds.access_token),
       )
+    }
+
+    // Email the business owner with customer profile + queries
+    try {
+      const ownerEmail = tenant.owner_email || 'zulfi@lycho.ai' // fallback to your email
+      const allMessages = [...messages, { role: 'assistant' as const, content: cleanResponse }]
+      const customerQueries = allMessages
+        .filter(m => m.role === 'user')
+        .map(m => m.content)
+
+      await sendCustomerProfileEmail({
+        to: ownerEmail,
+        customerName: conversation.metadata?.contact_profile?.name || contact?.profile?.name || 'Unknown',
+        contactIdentifier: inbound.contactIdentifier,
+        profile: conversation.metadata?.contact_profile || {},
+        queries: customerQueries,
+        conversationId: conversation.id,
+        channel: 'whatsapp',
+        sentiment: metadata?.sentiment ?? emotion.state ?? 'neutral',
+        leadScore: leadScore,
+      })
+    } catch {
+      // Don't fail the webhook if email fails
     }
   } catch {
     // Errors are non-fatal — response is returned below

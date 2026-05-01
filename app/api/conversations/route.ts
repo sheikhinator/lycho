@@ -18,6 +18,7 @@ import { injectIntelligence, scoreConversation } from '@/lib/orion/orion-engine'
 import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
 import { transmit } from '@/lib/syndicate/syndicate'
 import { searchKnowledge } from '@/lib/knowledge/knowledge-engine'
+import { orchestrateResponse } from '@/lib/agents/master-agent'
 
 const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
@@ -285,59 +286,70 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // 6b. Normal streaming path
+        // 6b. OTHERWORLDLY: Master Orchestrator path (intelligent execution)
         if (!complexity.needsCouncil || complexity.suggestedAgents.length <= 1) {
-          let orionPrompt = basePrompt
-          try { orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt) } catch {}
+          try {
+            // Use master orchestrator for intelligent response + action execution
+            const orchestration = await orchestrateResponse({
+              tenant,
+              agent,
+              conversation: conversation!,
+              message: body.message,
+              contactProfile: existingProfile,
+              emotion: analyseEmotion(body.message, priorMessages),
+              memoryContext: deepMemory || '',
+            })
 
-          // Persona injection (LYCHO Persona)
-          let personaPrefix = ''
-          try { personaPrefix = await buildPersonaPrompt(agent.agent_type as string) } catch {}
-          if (personaPrefix) orionPrompt = `${personaPrefix}\n\n${orionPrompt}`
+            agentResponse = orchestration.primary_response
+            modelUsed = 'master-orchestrator'
 
-          // RAG: inject knowledge context
-          let knowledgeContext = ''
-          try { knowledgeContext = await searchKnowledge(tenantId, body.message) } catch {}
-
-          const enrichedPrompt = knowledgeContext
-            ? `${orionPrompt}\n\nRELEVANT KNOWLEDGE FROM CLIENT'S KNOWLEDGE BASE:\n${knowledgeContext}\n\nUse this knowledge when relevant. Always prioritise it over general knowledge.`
-            : orionPrompt
-          const memoryInjection = deepMemory
-            ? `\n\nWHAT YOU REMEMBER ABOUT THIS CONTACT:\n${deepMemory}\n\nUse this context naturally. Don't reference it explicitly.`
-            : ''
-          const systemPrompt = (extraContext ? `${enrichedPrompt}\n\n${extraContext}` : enrichedPrompt) + memoryInjection
-
-          // Web search for research/analyst/market agents
-          const SEARCH_TYPES = ['research', 'analyst', 'compliance', 'content']
-          const agentT = agent.agent_type as string
-          const shouldSearch = SEARCH_TYPES.includes(agentT) ||
-            agentT.includes('research') || agentT.includes('market') || agentT.includes('competitor')
-
-          const openaiMessages = [
-            { role: 'system' as const, content: systemPrompt },
-            ...messages.slice(-20).map(m => ({
-              role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-              content: m.content
-            }))
-          ]
-
-          const stream = await openai.chat.completions.create({
-            model,
-            max_tokens: maxTokens,
-            messages: openaiMessages,
-            stream: true,
-          })
-
-          const chunks: string[] = []
-          for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content || ''
-            if (text) {
-              chunks.push(text)
-              enqueue(`data: ${JSON.stringify({ text })}\n\n`)
+            // Stream the response
+            const words = agentResponse.split(' ')
+            for (const word of words) {
+              enqueue(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`)
+              // Small delay for streaming effect
+              await new Promise(r => setTimeout(r, 20))
             }
+
+            // Log actions executed
+            if (orchestration.actions_executed.length > 0) {
+              console.log(`[ORCHESTRATOR] Executed ${orchestration.actions_executed.length} actions:`,
+                orchestration.actions_executed.map(a => a.message))
+            }
+          } catch (orchError) {
+            // Fallback to base prompt if orchestrator fails
+            console.error('Orchestrator failed, falling back:', orchError)
+            
+            let orionPrompt = basePrompt
+            try { orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt) } catch {}
+
+            const systemPrompt = extraContext ? `${orionPrompt}\n\n${extraContext}` : orionPrompt
+            const openaiMessages = [
+              { role: 'system' as const, content: systemPrompt },
+              ...messages.slice(-20).map(m => ({
+                role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
+                content: m.content
+              }))
+            ]
+
+            const stream = await openai.chat.completions.create({
+              model,
+              max_tokens: maxTokens,
+              messages: openaiMessages,
+              stream: true,
+            })
+
+            const chunks: string[] = []
+            for await (const chunk of stream) {
+              const text = chunk.choices[0]?.delta?.content || ''
+              if (text) {
+                chunks.push(text)
+                enqueue(`data: ${JSON.stringify({ text })}\n\n`)
+              }
+            }
+            agentResponse = chunks.join('')
+            modelUsed = model
           }
-          agentResponse = chunks.join('')
-          modelUsed = model
         }
       } catch {
         enqueue(`data: ${JSON.stringify({ text: 'Error — please try again' })}\n\n`)
