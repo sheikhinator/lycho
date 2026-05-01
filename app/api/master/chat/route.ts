@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,295 +15,379 @@ const supabaseAdmin = createClient(
 // ── ORION TOOLS ──────────────────────────────────────────────────────────────
 
 // ORION TOOLS
-const orionTools: Anthropic.Tool[] = [
+const orionTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: 'run_optimisation',
-    description: 'Trigger ORION nightly optimisation now — rewrites underperforming agent prompts',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'update_agent_prompt',
-    description: 'Directly rewrite the optimised prompt for a specific agent type',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_type: { type: 'string', description: 'The agent type slug' },
-        new_prompt: { type: 'string', description: 'The new system prompt to set' },
-        reason: { type: 'string', description: 'Why this change is being made' }
-      },
-      required: ['agent_type', 'new_prompt', 'reason']
+    type: 'function',
+    function: {
+      name: 'run_optimisation',
+      description: 'Trigger ORION nightly optimisation now — rewrites underperforming agent prompts',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {
-    name: 'boost_agent_score',
-    description: 'Manually set the intelligence score for an agent',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_type: { type: 'string' },
-        score: { type: 'number', description: '0-100' },
-        reason: { type: 'string' }
-      },
-      required: ['agent_type', 'score', 'reason']
+    type: 'function',
+    function: {
+      name: 'update_agent_prompt',
+      description: 'Directly rewrite the optimised prompt for a specific agent type',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_type: { type: 'string', description: 'The agent type slug' },
+          new_prompt: { type: 'string', description: 'The new system prompt to set' },
+          reason: { type: 'string', description: 'Why this change is being made' }
+        },
+        required: ['agent_type', 'new_prompt', 'reason']
+      }
     }
   },
   {
-    name: 'get_agent_intelligence',
-    description: 'Fetch full intelligence data for a specific agent type',
-    input_schema: {
-      type: 'object' as const,
-      properties: { agent_type: { type: 'string' } },
-      required: ['agent_type']
+    type: 'function',
+    function: {
+      name: 'boost_agent_score',
+      description: 'Manually set the intelligence score for an agent',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_type: { type: 'string' },
+          score: { type: 'number', description: '0-100' },
+          reason: { type: 'string' }
+        },
+        required: ['agent_type', 'score', 'reason']
+      }
     }
   },
   {
-    name: 'seed_countries',
-    description: 'Re-seed all country profiles into the database',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
+    type: 'function',
+    function: {
+      name: 'get_agent_intelligence',
+      description: 'Fetch full intelligence data for a specific agent type',
+      parameters: {
+        type: 'object',
+        properties: { agent_type: { type: 'string' } },
+        required: ['agent_type']
+      }
+    }
   },
   {
-    name: 'initialize_core_agents',
-    description: 'Initialize all 7 core agent types (intake, research, operations, client, analyst, compliance, content) in the Orion intelligence store with optimised prompts',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
+    type: 'function',
+    function: {
+      name: 'seed_countries',
+      description: 'Re-seed all country profiles into the database',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
   },
   {
-    name: 'apply_geo_to_tenant',
-    description: 'Apply geo-intelligence for a specific country to all agents of a tenant',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        tenant_id: { type: 'string' },
-        country_code: { type: 'string' }
-      },
-      required: ['tenant_id', 'country_code']
+    type: 'function',
+    function: {
+      name: 'initialize_core_agents',
+      description: 'Initialize all 7 core agent types (intake, research, operations, client, analyst, compliance, content) in the Orion intelligence store with optimised prompts',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'apply_geo_to_tenant',
+      description: 'Apply geo-intelligence for a specific country to all agents of a tenant',
+      parameters: {
+        type: 'object',
+        properties: {
+          tenant_id: { type: 'string' },
+          country_code: { type: 'string' }
+        },
+        required: ['tenant_id', 'country_code']
+      }
     }
   }
 ]
 
 // ── FORGE TOOLS ──────────────────────────────────────────────────────────────
 
-const forgeTools: Anthropic.Tool[] = [
+const forgeTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: 'run_forge',
-    description: 'Trigger Forge autonomous agent generation now',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'create_agent',
-    description: 'Create and queue a specific agent with custom spec',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_type: { type: 'string', description: 'Slug e.g. insurance_claims_agent' },
-        display_name: { type: 'string' },
-        description: { type: 'string' },
-        system_prompt: { type: 'string' },
-        sector_tags: { type: 'array', items: { type: 'string' } },
-        model_complexity: { type: 'string', enum: ['simple', 'complex'] },
-        estimated_value_pkr: { type: 'number' },
-        use_case_examples: { type: 'array', items: { type: 'string' } },
-        why_novel: { type: 'string' }
-      },
-      required: ['agent_type', 'display_name', 'description', 'system_prompt']
+    type: 'function',
+    function: {
+      name: 'run_forge',
+      description: 'Trigger Forge autonomous agent generation now',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {
-    name: 'approve_agent',
-    description: 'Approve a pending agent from the Forge queue and deploy it',
-    input_schema: {
-      type: 'object' as const,
-      properties: { agent_id: { type: 'string', description: 'UUID of the forge_queue entry' } },
-      required: ['agent_id']
+    type: 'function',
+    function: {
+      name: 'create_agent',
+      description: 'Create and queue a specific agent with custom spec',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_type: { type: 'string', description: 'Slug e.g. insurance_claims_agent' },
+          display_name: { type: 'string' },
+          description: { type: 'string' },
+          system_prompt: { type: 'string' },
+          sector_tags: { type: 'array', items: { type: 'string' } },
+          model_complexity: { type: 'string', enum: ['simple', 'complex'] },
+          estimated_value_pkr: { type: 'number' },
+          use_case_examples: { type: 'array', items: { type: 'string' } },
+          why_novel: { type: 'string' }
+        },
+        required: ['agent_type', 'display_name', 'description', 'system_prompt']
+      }
     }
   },
   {
-    name: 'reject_agent',
-    description: 'Reject a pending agent from the Forge queue',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_id: { type: 'string' },
-        reason: { type: 'string' }
-      },
-      required: ['agent_id', 'reason']
+    type: 'function',
+    function: {
+      name: 'approve_agent',
+      description: 'Approve a pending agent from the Forge queue and deploy it',
+      parameters: {
+        type: 'object',
+        properties: { agent_id: { type: 'string', description: 'UUID of the forge_queue entry' } },
+        required: ['agent_id']
+      }
     }
   },
   {
-    name: 'list_queue',
-    description: 'List all agents currently in the Forge queue',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
+    type: 'function',
+    function: {
+      name: 'reject_agent',
+      description: 'Reject a pending agent from the Forge queue',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_id: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['agent_id', 'reason']
+      }
+    }
   },
   {
-    name: 'update_agent_spec',
-    description: 'Update an existing agent spec in the forge queue before approval',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_id: { type: 'string' },
-        updates: { type: 'object', description: 'Fields to update: display_name, description, system_prompt, etc.' }
-      },
-      required: ['agent_id', 'updates']
+    type: 'function',
+    function: {
+      name: 'list_queue',
+      description: 'List all agents currently in the Forge queue',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_agent_spec',
+      description: 'Update an existing agent spec in the forge queue before approval',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_id: { type: 'string' },
+          updates: { type: 'object', description: 'Fields to update: display_name, description, system_prompt, etc.' }
+        },
+        required: ['agent_id', 'updates']
+      }
     }
   }
 ]
 
 // ── SYNDICATE TOOLS ──────────────────────────────────────────────────────────
 
-const syndicateTools: Anthropic.Tool[] = [
+const syndicateTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: 'syndicate_transmit',
-    description: 'Send a Syndicate message from one agent to another',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        from_agent: { type: 'string' },
-        to_agent: { type: 'string' },
-        message_type: { type: 'string', description: 'e.g. request_analysis, share_intelligence, forge_brief, security_check' },
-        message: { type: 'string', description: 'The message/payload content' }
-      },
-      required: ['from_agent', 'to_agent', 'message_type', 'message']
+    type: 'function',
+    function: {
+      name: 'syndicate_transmit',
+      description: 'Send a Syndicate message from one agent to another',
+      parameters: {
+        type: 'object',
+        properties: {
+          from_agent: { type: 'string' },
+          to_agent: { type: 'string' },
+          message_type: { type: 'string', description: 'e.g. request_analysis, share_intelligence, forge_brief, security_check' },
+          message: { type: 'string', description: 'The message/payload content' }
+        },
+        required: ['from_agent', 'to_agent', 'message_type', 'message']
+      }
     }
   },
   {
-    name: 'syndicate_broadcast',
-    description: 'Broadcast a message from one agent to multiple agents simultaneously',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        from_agent: { type: 'string' },
-        to_agents: { type: 'array', items: { type: 'string' }, description: 'Array of agent names' },
-        message: { type: 'string' }
-      },
-      required: ['from_agent', 'to_agents', 'message']
+    type: 'function',
+    function: {
+      name: 'syndicate_broadcast',
+      description: 'Broadcast a message from one agent to multiple agents simultaneously',
+      parameters: {
+        type: 'object',
+        properties: {
+          from_agent: { type: 'string' },
+          to_agents: { type: 'array', items: { type: 'string' }, description: 'Array of agent names' },
+          message: { type: 'string' }
+        },
+        required: ['from_agent', 'to_agents', 'message']
+      }
     }
   },
   {
-    name: 'get_syndicate_messages',
-    description: 'View recent Syndicate traffic — all messages flowing through the network',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        from_agent: { type: 'string', description: 'Filter by sender (optional)' },
-        to_agent:   { type: 'string', description: 'Filter by recipient (optional)' },
-        limit:      { type: 'number', description: 'Number of messages (default 20)' }
-      },
-      required: []
+    type: 'function',
+    function: {
+      name: 'get_syndicate_messages',
+      description: 'View recent Syndicate traffic — all messages flowing through the network',
+      parameters: {
+        type: 'object',
+        properties: {
+          from_agent: { type: 'string', description: 'Filter by sender (optional)' },
+          to_agent:   { type: 'string', description: 'Filter by recipient (optional)' },
+          limit:      { type: 'number', description: 'Number of messages (default 20)' }
+        },
+        required: []
+      }
     }
   },
   {
-    name: 'get_syndicate_routes',
-    description: 'View all Syndicate routes — the network map of agent connections',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'toggle_route',
-    description: 'Enable or disable a Syndicate route',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        route_id: { type: 'string', description: 'Route UUID' },
-        active:   { type: 'boolean' }
-      },
-      required: ['route_id', 'active']
+    type: 'function',
+    function: {
+      name: 'get_syndicate_routes',
+      description: 'View all Syndicate routes — the network map of agent connections',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {
-    name: 'add_route',
-    description: 'Add a new route between two agents in the Syndicate',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        from_agent:    { type: 'string' },
-        to_agent:      { type: 'string' },
-        route_type:    { type: 'string', description: 'e.g. strategic, security, quality, coordination, reporting' },
-        bidirectional: { type: 'boolean' }
-      },
-      required: ['from_agent', 'to_agent', 'route_type']
+    type: 'function',
+    function: {
+      name: 'toggle_route',
+      description: 'Enable or disable a Syndicate route',
+      parameters: {
+        type: 'object',
+        properties: {
+          route_id: { type: 'string', description: 'Route UUID' },
+          active:   { type: 'boolean' }
+        },
+        required: ['route_id', 'active']
+      }
     }
   },
   {
-    name: 'seed_syndicate',
-    description: 'Seed all Syndicate routes and agent registry — run once to initialise the network',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'register_agent',
-    description: 'Register an agent in the Syndicate network with auto-routes',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        agent_type: { type: 'string' },
-        display_name: { type: 'string' }
-      },
-      required: ['agent_type', 'display_name']
+    type: 'function',
+    function: {
+      name: 'add_route',
+      description: 'Add a new route between two agents in the Syndicate',
+      parameters: {
+        type: 'object',
+        properties: {
+          from_agent:    { type: 'string' },
+          to_agent:      { type: 'string' },
+          route_type:    { type: 'string', description: 'e.g. strategic, security, quality, coordination, reporting' },
+          bidirectional: { type: 'boolean' }
+        },
+        required: ['from_agent', 'to_agent', 'route_type']
+      }
     }
   },
   {
-    name: 'get_registry',
-    description: 'View all agents registered in the Syndicate network',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'run_forge',
-    description: 'Trigger Forge agent generation via Syndicate',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'run_orion_optimise',
-    description: 'Trigger Orion nightly optimisation via Syndicate',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'run_nexus',
-    description: 'Trigger Nexus template generation via Syndicate',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'initialize_all_agents',
-    description: 'Initialize all core agents in the Orion intelligence store',
-    input_schema: {
-      type: 'object' as const,
-      properties: { country_code: { type: 'string', description: 'e.g. PK, AE, GB (default: PK)' } },
-      required: []
+    type: 'function',
+    function: {
+      name: 'seed_syndicate',
+      description: 'Seed all Syndicate routes and agent registry — run once to initialise the network',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {
-    name: 'seed_all',
-    description: 'MASTER ONLY — Full platform init: countries + Syndicate routes + registry + all core agents',
-    input_schema: {
-      type: 'object' as const,
-      properties: { country_code: { type: 'string' } },
-      required: []
+    type: 'function',
+    function: {
+      name: 'register_agent',
+      description: 'Register an agent in the Syndicate network with auto-routes',
+      parameters: {
+        type: 'object',
+        properties: {
+          agent_type: { type: 'string' },
+          display_name: { type: 'string' }
+        },
+        required: ['agent_type', 'display_name']
+      }
     }
   },
   {
-    name: 'get_platform_health',
-    description: 'Full health report across all LYCHO systems',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
+    type: 'function',
+    function: {
+      name: 'get_registry',
+      description: 'View all agents registered in the Syndicate network',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_forge',
+      description: 'Trigger Forge agent generation via Syndicate',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_orion_optimise',
+      description: 'Trigger Orion nightly optimisation via Syndicate',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_nexus',
+      description: 'Trigger Nexus template generation via Syndicate',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'initialize_all_agents',
+      description: 'Initialize all core agents in the Orion intelligence store',
+      parameters: {
+        type: 'object',
+        properties: { country_code: { type: 'string', description: 'e.g. PK, AE, GB (default: PK)' } },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'seed_all',
+      description: 'MASTER ONLY — Full platform init: countries + Syndicate routes + registry + all core agents',
+      parameters: {
+        type: 'object',
+        properties: { country_code: { type: 'string' } },
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_platform_health',
+      description: 'Full health report across all LYCHO systems',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
   }
 ]
 
 // ── ORION UNRESTRICTED TOOLS ─────────────────────────────────────────────────
-const ORION_UNRESTRICTED_TOOLS: Anthropic.Tool[] = [
-  { name: 'fix_all_agents', description: 'Fix all agents — rewrites underperforming prompts, re-initializes broken ones', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'get_all_agents', description: 'Get all agents across all tenants with status and performance', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'update_agent_prompt', description: 'Update any agent system prompt in real time', input_schema: {
-      type: 'object' as const,
+const ORION_UNRESTRICTED_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  { type: 'function', function: { name: 'fix_all_agents', description: 'Fix all agents — rewrites underperforming prompts, re-initializes broken ones', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'get_all_agents', description: 'Get all agents across all tenants with status and performance', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'update_agent_prompt', description: 'Update any agent system prompt in real time', parameters: {
+      type: 'object',
       properties: {
         agent_type: { type: 'string' },
         new_prompt: { type: 'string' },
         reason: { type: 'string' }
       },
       required: ['agent_type','new_prompt']
-    } },
-  { name: 'update_marketplace_agent', description: 'Update marketplace agent prompt and metadata', input_schema: { type: 'object' as const, properties: { agent_type: { type: 'string' }, updates: { type: 'object' } }, required: ['agent_type','updates'] } },
-  { name: 'deploy_agent_to_tenant', description: 'Deploy any agent to any tenant', input_schema: { type: 'object' as const, properties: { tenant_id: { type: 'string' }, agent_type: { type: 'string' } }, required: ['tenant_id','agent_type'] } },
-  { name: 'fix_agent_by_type', description: 'Fix a specific agent type across the platform', input_schema: { type: 'object' as const, properties: { agent_type: { type: 'string' } }, required: ['agent_type'] } },
-  { name: 'get_all_tenants', description: 'Get all tenants with full details', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'get_platform_errors', description: 'Get recent errors from Vercel logs and Sentry', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'fix_notifications', description: 'Fix notifications table and API', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'run_database_health_check', description: 'Check all tables exist with correct columns', input_schema: { type: 'object' as const, properties: {}, required: [] } },
-  { name: 'fix_missing_columns', description: 'Add any missing database columns', input_schema: { type: 'object' as const, properties: {}, required: [] } }
+    } } },
+  { type: 'function', function: { name: 'update_marketplace_agent', description: 'Update marketplace agent prompt and metadata', parameters: { type: 'object', properties: { agent_type: { type: 'string' }, updates: { type: 'object' } }, required: ['agent_type','updates'] } } },
+  { type: 'function', function: { name: 'deploy_agent_to_tenant', description: 'Deploy any agent to any tenant', parameters: { type: 'object', properties: { tenant_id: { type: 'string' }, agent_type: { type: 'string' } }, required: ['tenant_id','agent_type'] } } },
+  { type: 'function', function: { name: 'fix_agent_by_type', description: 'Fix a specific agent type across the platform', parameters: { type: 'object', properties: { agent_type: { type: 'string' } }, required: ['agent_type'] } } },
+  { type: 'function', function: { name: 'get_all_tenants', description: 'Get all tenants with full details', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'get_platform_errors', description: 'Get recent errors from Vercel logs and Sentry', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'fix_notifications', description: 'Fix notifications table and API', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'run_database_health_check', description: 'Check all tables exist with correct columns', parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'fix_missing_columns', description: 'Add any missing database columns', parameters: { type: 'object', properties: {}, required: [] } } }
 ]
 
 // Merge unrestricted tools into the Orion toolset
@@ -313,63 +397,81 @@ orionTools.push(...ORION_UNRESTRICTED_TOOLS)
 
 // ── NEXUS TOOLS ──────────────────────────────────────────────────────────────
 
-const nexusTools: Anthropic.Tool[] = [
+const nexusTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: 'run_nexus',
-    description: 'Trigger Nexus autonomous template generation now',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
-  },
-  {
-    name: 'create_template',
-    description: 'Create and queue a new automation template',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        name: { type: 'string' },
-        description: { type: 'string' },
-        category: { type: 'string' },
-        trigger: { type: 'object', description: '{ type: string, conditions: object }' },
-        actions: { type: 'array', description: 'Array of action objects' },
-        sector_tags: { type: 'array', items: { type: 'string' } },
-        use_case_examples: { type: 'array', items: { type: 'string' } },
-        why_useful: { type: 'string' }
-      },
-      required: ['name', 'description', 'category', 'trigger', 'actions']
+    type: 'function',
+    function: {
+      name: 'run_nexus',
+      description: 'Trigger Nexus autonomous template generation now',
+      parameters: { type: 'object', properties: {}, required: [] }
     }
   },
   {
-    name: 'approve_template',
-    description: 'Approve and publish a pending template from the Nexus queue',
-    input_schema: {
-      type: 'object' as const,
-      properties: { template_id: { type: 'string' } },
-      required: ['template_id']
+    type: 'function',
+    function: {
+      name: 'create_template',
+      description: 'Create and queue a new automation template',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          category: { type: 'string' },
+          trigger: { type: 'object', description: '{ type: string, conditions: object }' },
+          actions: { type: 'array', description: 'Array of action objects' },
+          sector_tags: { type: 'array', items: { type: 'string' } },
+          use_case_examples: { type: 'array', items: { type: 'string' } },
+          why_useful: { type: 'string' }
+        },
+        required: ['name', 'description', 'category', 'trigger', 'actions']
+      }
     }
   },
   {
-    name: 'reject_template',
-    description: 'Reject a pending template from the Nexus queue',
-    input_schema: {
-      type: 'object' as const,
-      properties: { template_id: { type: 'string' }, reason: { type: 'string' } },
-      required: ['template_id', 'reason']
+    type: 'function',
+    function: {
+      name: 'approve_template',
+      description: 'Approve and publish a pending template from the Nexus queue',
+      parameters: {
+        type: 'object',
+        properties: { template_id: { type: 'string' } },
+        required: ['template_id']
+      }
     }
   },
   {
-    name: 'list_templates',
-    description: 'List all published automation templates',
-    input_schema: { type: 'object' as const, properties: {}, required: [] }
+    type: 'function',
+    function: {
+      name: 'reject_template',
+      description: 'Reject a pending template from the Nexus queue',
+      parameters: {
+        type: 'object',
+        properties: { template_id: { type: 'string' }, reason: { type: 'string' } },
+        required: ['template_id', 'reason']
+      }
+    }
   },
   {
-    name: 'update_template',
-    description: 'Update an existing published template',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        template_id: { type: 'string' },
-        updates: { type: 'object', description: 'Fields to update' }
-      },
-      required: ['template_id', 'updates']
+    type: 'function',
+    function: {
+      name: 'list_templates',
+      description: 'List all published automation templates',
+      parameters: { type: 'object', properties: {}, required: [] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_template',
+      description: 'Update an existing published template',
+      parameters: {
+        type: 'object',
+        properties: {
+          template_id: { type: 'string' },
+          updates: { type: 'object', description: 'Fields to update' }
+        },
+        required: ['template_id', 'updates']
+      }
     }
   }
 ]
@@ -842,7 +944,7 @@ export async function POST(req: NextRequest) {
   const systemBase = IDENTITIES[entityKey]
   if (!systemBase) return NextResponse.json({ error: 'Unknown entity. Use: orion, forge, nexus, syndicate' }, { status: 400 })
 
-  const toolMap: Record<string, Anthropic.Tool[]> = { orion: orionTools, forge: forgeTools, nexus: nexusTools, syndicate: syndicateTools }
+  const toolMap: Record<string, OpenAI.Chat.Completions.ChatCompletionTool[]> = { orion: orionTools, forge: forgeTools, nexus: nexusTools, syndicate: syndicateTools }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const executorMap: Record<string, (name: string, input: Record<string, any>) => Promise<string>> = {
     orion: executeOrionTool, forge: executeForgeToolFn, nexus: executeNexusToolFn, syndicate: executeSyndicateTool
@@ -854,55 +956,63 @@ export async function POST(req: NextRequest) {
     const liveContext = await getLiveContext(entityKey)
     const system = systemBase + liveContext
 
-    const messages: Anthropic.MessageParam[] = [
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: system },
       ...history.slice(-10).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
       { role: 'user', content: message }
     ]
 
     // Agentic loop — allows tool use + results
-    let response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    let response = await openai.chat.completions.create({
+      model: 'claude-haiku-4-5',
       max_tokens: 1000,
-      system,
       tools,
       messages
     })
 
     const toolResults: string[] = []
+    let responseMessage = response.choices[0]?.message
 
     // Execute any tool calls
-    while (response.stop_reason === 'tool_use') {
-      const toolUses = response.content.filter(b => b.type === 'tool_use')
-      const toolResultBlocks: Anthropic.ToolResultBlockParam[] = []
+    while (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+      const toolCalls = responseMessage.tool_calls
+      const toolResultBlocks: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = []
 
-      for (const block of toolUses) {
-        if (block.type !== 'tool_use') continue
+      for (const toolCall of toolCalls) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const result = await executor(block.name, block.input as Record<string, any>)
-          toolResults.push(`[${block.name}]: ${result}`)
-          toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+          const result = await executor(toolCall.function.name, JSON.parse(toolCall.function.arguments))
+          toolResults.push(`[${toolCall.function.name}]: ${result}`)
+          toolResultBlocks.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result
+          } as OpenAI.Chat.Completions.ChatCompletionMessageParam)
         } catch (toolErr: unknown) {
           const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
-          console.error(`[master/chat] tool ${block.name} threw:`, msg)
-          toolResultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${msg}` })
+          console.error(`[master/chat] tool ${toolCall.function.name} threw:`, msg)
+          toolResultBlocks.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: `Error: ${msg}`
+          } as OpenAI.Chat.Completions.ChatCompletionMessageParam)
         }
       }
 
-      messages.push({ role: 'assistant', content: response.content })
-      messages.push({ role: 'user', content: toolResultBlocks })
+      messages.push(responseMessage as OpenAI.Chat.Completions.ChatCompletionMessageParam)
+      messages.push(...toolResultBlocks)
 
-      response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+      response = await openai.chat.completions.create({
+        model: 'claude-haiku-4-5',
         max_tokens: 800,
-        system,
         tools,
         messages
       })
+
+      responseMessage = response.choices[0]?.message
     }
 
-    const reply = response.content.find(b => b.type === 'text')
-    const replyText = reply?.type === 'text' ? reply.text : 'Done.'
+    const replyText = responseMessage?.content || 'Done.'
 
     return NextResponse.json({
       success: true,

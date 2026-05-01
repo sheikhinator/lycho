@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 export async function extractMemories(
   tenantId: string,
@@ -18,8 +18,8 @@ export async function extractMemories(
 
   const conversation = messages.map(m => `${m.role}: ${m.content}`).join('\n')
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 400,
     messages: [{
       role: 'user',
@@ -33,7 +33,7 @@ Max 5 facts. Return only valid JSON array.`,
     }],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  const text = response.choices[0]?.message?.content || '[]'
   try {
     const memories = JSON.parse(text.replace(/```json|```/g, '').trim())
     for (const m of memories) {

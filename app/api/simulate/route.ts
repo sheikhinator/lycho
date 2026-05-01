@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/api'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 export async function POST(request: Request) {
   const ctx = await getAuthContext()
@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     ? Math.round(recentConvos.reduce((s, c) => s + ((c.metadata as any)?.lead_score ?? 0), 0) / recentConvos.length)
     : 50
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+  const response = await openai.chat.completions.create({
+    model: 'claude-sonnet-4-5',
     max_tokens: 800,
     messages: [{
       role: 'user',
@@ -71,6 +71,6 @@ Be specific with numbers and timeframes. Ground in the actual business context.`
     }],
   })
 
-  const result = response.content[0].type === 'text' ? response.content[0].text : ''
+  const result = response.choices[0]?.message?.content || ''
   return NextResponse.json({ result, scenario: body.scenario })
 }

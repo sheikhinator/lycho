@@ -70,17 +70,17 @@ export async function getSystemPrompt(
   }
 
   // 5. Auto-generate via Haiku and cache
-  const { Anthropic } = await import('@anthropic-ai/sdk')
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const { OpenAI } = await import('openai')
+  const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 500,
     messages: [{
       role: 'user',
       content: `Write a system prompt for a specialist AI agent called "${agentType.replace(/_/g, ' ')}". Keep it under 200 words. Include: role, 3 key capabilities, language support, Human Sovereignty constraint, METADATA extraction. Return only the system prompt text, nothing else.`,
     }],
   })
-  const generated = response.content[0].type === 'text' ? response.content[0].text : ''
+  const generated = response.choices[0]?.message?.content || ''
 
   await supabase.from('marketplace_agents').upsert({
     agent_type:       agentType,

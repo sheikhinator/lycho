@@ -22,11 +22,11 @@ All variables must be set in `.env.local` for local development and in **Vercel 
 
 ---
 
-## Anthropic (Claude AI)
+## OpenCode AI
 
 | Variable | Description | Where to get it |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | API key to call Claude (Sonnet, Haiku) | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| `OPENCODE_API_KEY` | API key to call OpenCode models (big-pickle, claude-haiku-4-5, claude-sonnet-4-5) | Provided by OpenCode (use: sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu) |
 
 ---
 
@@ -98,7 +98,7 @@ Emails are sent from `alerts@lycho.ai`. You must verify your domain in Resend be
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY`
+- `OPENCODE_API_KEY`
 
 **Required for email notifications:**
 - `RESEND_API_KEY`

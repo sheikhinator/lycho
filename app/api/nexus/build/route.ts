@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { getAuthContext, ok, err } from '@/lib/api'
 
 export async function POST(request: Request) {
@@ -9,10 +9,10 @@ export async function POST(request: Request) {
   const { description, category } = await request.json().catch(() => ({}))
   if (!description?.trim()) return err('Description required', 'MISSING_FIELD', 400)
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 1200,
     messages: [{
       role: 'user',
@@ -39,7 +39,7 @@ Return ONLY valid JSON (no markdown):
     }]
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = response.choices[0]?.message?.content || ''
   const match = text.match(/\{[\s\S]*\}/)
   if (!match) return err('Failed to build automation', 'BUILD_ERROR', 500)
 

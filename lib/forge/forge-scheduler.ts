@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { generateForgeBrief } from '@/lib/orion/forge-collaboration'
@@ -8,6 +8,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
+
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 // Global prompt — builds agents for businesses worldwide
 const FORGE_PROMPT = `Output ONLY a valid JSON array of 5 AI agent specs. No text before or after. No markdown.
@@ -20,15 +22,17 @@ Focus on: real business pain points, compliance, automation, productivity. Globa
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyAgent = Record<string, any>
 
-async function testAgentPrompt(anthropic: Anthropic, prompt: string, agentType: string): Promise<boolean> {
+async function testAgentPrompt(prompt: string, agentType: string): Promise<boolean> {
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const response = await openai.chat.completions.create({
+      model: 'claude-haiku-4-5',
       max_tokens: 100,
-      system: prompt,
-      messages: [{ role: 'user', content: 'Hello, can you help me?' }],
+      messages: [
+        { role: 'system', content: prompt },
+        { role: 'user', content: 'Hello, can you help me?' }
+      ],
     })
-    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+    const reply = response.choices[0]?.message?.content || ''
     return reply.length > 20 && !reply.toLowerCase().includes('error')
   } catch {
     console.log('Test failed for:', agentType)
@@ -45,8 +49,6 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
     .not('status', 'eq', 'rejected')
 
   const existingTypes: string[] = existing?.map((e: AnyAgent) => e.agent_type) || []
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   // Request Orion brief via Syndicate
   let orionBrief = ''
@@ -69,8 +71,8 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
     try { orionBrief = await generateForgeBrief() } catch { /* ignore */ }
   }
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 1500,
     messages: [{
       role: 'user',
@@ -78,7 +80,7 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
     }],
   })
 
-  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  const raw = response.choices[0]?.message?.content?.trim() || ''
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   console.log('Response length:', cleaned.length)
   console.log('Preview:', cleaned.substring(0, 100))
@@ -106,7 +108,7 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
   const tested: AnyAgent[] = []
   for (const agent of novel) {
     console.log('Testing:', agent.agent_type)
-    const passes = await testAgentPrompt(anthropic, agent.system_prompt, agent.agent_type)
+    const passes = await testAgentPrompt(agent.system_prompt, agent.agent_type)
     if (passes) {
       tested.push(agent)
       console.log('✅ Passed:', agent.agent_type)

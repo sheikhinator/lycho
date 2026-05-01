@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 // ============================================================
 // ORION FUNCTION 1 — INTELLIGENCE INJECTION
@@ -44,8 +44,8 @@ export async function injectIntelligence(
     return countryVariant
   }
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 800,
     messages: [{
       role: 'user',
@@ -73,7 +73,7 @@ Return only the system prompt text. Make it exceptional.`
     }]
   })
 
-  const optimisedPrompt = response.content[0].type === 'text' ? response.content[0].text : basePrompt || ''
+  const optimisedPrompt = response.choices[0]?.message?.content || basePrompt || ''
   const countryVariant = `${optimisedPrompt}\n\nGEO-INTELLIGENCE:\n${countryInjection}`
 
   await supabaseAdmin.from('orion_agent_intelligence').upsert({
@@ -166,8 +166,8 @@ export async function runNightlyOptimisation(): Promise<{ optimised: number }> {
       const avgScore = perf.avg_conversation_score || 50
 
       if (avgScore < 65) {
-        const response = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
+        const response = await openai.chat.completions.create({
+          model: 'claude-haiku-4-5',
           max_tokens: 800,
           messages: [{
             role: 'user',
@@ -187,7 +187,7 @@ Return only the new system prompt.`
           }]
         })
 
-        const newPrompt = response.content[0].type === 'text' ? response.content[0].text : agent.optimised_prompt
+        const newPrompt = response.choices[0]?.message?.content || agent.optimised_prompt
 
         await supabaseAdmin.from('orion_optimisation_log').insert({
           agent_type: agent.agent_type,

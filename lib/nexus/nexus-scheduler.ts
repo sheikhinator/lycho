@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -6,6 +6,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
+
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 const NEXUS_PROMPT = `Output ONLY a JSON array of 3 automation template specs for Pakistani/GCC businesses. No text before or after. No markdown.
 
@@ -31,10 +33,8 @@ export async function runNexusScheduler(): Promise<{ templates_queued: number }>
 
   const existingIds: string[] = existing?.map((e: AnyTemplate) => e.template_id as string) || []
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 2000,
     messages: [{
       role: 'user',
@@ -42,7 +42,7 @@ export async function runNexusScheduler(): Promise<{ templates_queued: number }>
     }],
   })
 
-  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  const raw = response.choices[0]?.message?.content?.trim() || ''
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   console.log('Nexus response length:', cleaned.length)
 

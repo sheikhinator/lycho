@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 export type SyndicateMessageType =
   | 'request_analysis'
@@ -57,8 +57,8 @@ export async function getSyndicateIntelligence(): Promise<string> {
     supabaseAdmin.from('syndicate_messages').select('from_agent,to_agent,status').order('created_at', { ascending: false }).limit(10)
   ])
 
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 800,
     messages: [{
       role: 'user',
@@ -77,7 +77,7 @@ Return only the system prompt. Be concise and powerful.`
     }]
   })
 
-  const prompt = response.content[0].type === 'text' ? response.content[0].text : 'You are THE SYNDICATE — LYCHO\'s inter-agent communication highway. You route messages, enforce security, and maintain network integrity.'
+  const prompt = response.choices[0]?.message?.content || 'You are THE SYNDICATE — LYCHO\'s inter-agent communication highway. You route messages, enforce security, and maintain network integrity.'
 
   await supabaseAdmin.from('orion_agent_intelligence').upsert({
     agent_type: 'syndicate',
@@ -271,13 +271,15 @@ async function handleSpecialist(message: SyndicateMessage): Promise<unknown> {
   const { injectIntelligence } = await import('@/lib/orion/orion-engine')
   const countryCode = typeof message.payload.country_code === 'string' ? message.payload.country_code : 'PK'
   const systemPrompt = await injectIntelligence(message.to_agent, countryCode)
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 400,
-    system: `${systemPrompt}\n\nYou are receiving a Syndicate message from ${message.from_agent}. Respond concisely with your specialist expertise.`,
-    messages: [{ role: 'user', content: `[${message.message_type}] from ${message.from_agent}: ${JSON.stringify(message.payload)}` }]
+    messages: [
+      { role: 'system', content: `${systemPrompt}\n\nYou are receiving a Syndicate message from ${message.from_agent}. Respond concisely with your specialist expertise.` },
+      { role: 'user', content: `[${message.message_type}] from ${message.from_agent}: ${JSON.stringify(message.payload)}` }
+    ]
   })
-  return { response: response.content[0].type === 'text' ? response.content[0].text : '', agent: message.to_agent }
+  return { response: response.choices[0]?.message?.content || '', agent: message.to_agent }
 }
 
 // ── GUARDIAN ────────────────────────────────────────────────────────────────

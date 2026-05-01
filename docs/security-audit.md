@@ -129,7 +129,7 @@ Also fixed pre-existing issues:
 | Variable | Exposure | Status |
 |---|---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |
-| `ANTHROPIC_API_KEY` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |
+| `OPENCODE_API_KEY` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |
 | `MASTER_SECRET` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |
 | `RESEND_API_KEY` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only | ✅ No `NEXT_PUBLIC_` prefix |

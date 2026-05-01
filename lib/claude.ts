@@ -1,13 +1,14 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu',
+  baseURL: 'https://opencode.ai/zen/v1',
 })
 
 export const MODELS = {
-  fast:     'claude-haiku-4-5-20251001',
-  smart:    'claude-sonnet-4-6',
-  fallback: 'gpt-4o-mini',
+  fast:     'claude-haiku-4-5',
+  smart:    'claude-sonnet-4-5',
+  fallback: 'gpt-5',
 }
 
 export function getModel(complexity: 'simple' | 'complex'): string {
@@ -39,20 +40,17 @@ export async function callClaude({
   useCache = true,
 }: ClaudeCallParams): Promise<ClaudeResponse> {
   try {
-    const systemContent = useCache
-      ? [{ type: 'text' as const, text: systemPrompt, cache_control: { type: 'ephemeral' as const } }]
-      : systemPrompt
-
-    const response = await anthropic.messages.create({
+    const response = await openai.chat.completions.create({
       model,
       max_tokens: maxTokens,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      system: systemContent as any,
-      messages: messages.slice(-20),
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
     })
 
-    const inputTokens  = response.usage.input_tokens
-    const outputTokens = response.usage.output_tokens
+    const inputTokens  = response.usage?.prompt_tokens || 0
+    const outputTokens = response.usage?.completion_tokens || 0
     const tokensUsed   = inputTokens + outputTokens
 
     const costUsd =
@@ -63,7 +61,7 @@ export async function callClaude({
     const estimatedCostPkr = costUsd * 280
 
     return {
-      response: response.content[0].type === 'text' ? response.content[0].text : '',
+      response: response.choices[0]?.message?.content || '',
       tokensUsed,
       inputTokens,
       outputTokens,

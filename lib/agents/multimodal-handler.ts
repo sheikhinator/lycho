@@ -1,26 +1,25 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type { MessageContent } from '@/lib/channels/channel-bus'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 export async function processMultimodalInput(content: MessageContent): Promise<string> {
   if (content.type === 'text') return content.text ?? ''
 
   if (content.type === 'image' && content.mediaUrl) {
     try {
-      const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+      const response = await openai.chat.completions.create({
+        model: 'claude-haiku-4-5',
         max_tokens: 150,
         messages: [{
           role: 'user',
           content: [
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            { type: 'image', source: { type: 'url', url: content.mediaUrl } } as any,
+            { type: 'image_url', image_url: { url: content.mediaUrl } } as any,
             { type: 'text',  text: 'Describe this image in one concise sentence relevant to a business customer service context.' },
-          ],
+          ] as any,
         }],
       })
-      const description = response.content[0].type === 'text' ? response.content[0].text : 'image'
+      const description = response.choices[0]?.message?.content || 'image'
       return `[Customer shared an image: ${description}]${content.caption ? ` Caption: "${content.caption}"` : ''}`
     } catch {
       return `[Customer shared an image]${content.caption ? ` Caption: "${content.caption}"` : ''}`

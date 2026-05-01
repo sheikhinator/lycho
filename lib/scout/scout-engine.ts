@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -7,20 +7,15 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-// web_search_20250305 is a beta tool not yet typed in the SDK — cast is intentional
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const webSearchTool = { type: 'web_search_20250305', name: 'web_search' } as any
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 async function scoutWithSearch(prompt: string): Promise<string> {
-  const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 600,
-    tools: [webSearchTool],
     messages: [{ role: 'user', content: prompt }]
   })
-  return response.content.filter(b => b.type === 'text').map(b => b.type === 'text' ? b.text : '').join('')
+  return response.choices[0]?.message?.content || ''
 }
 
 export async function runMarketScout(): Promise<string> {

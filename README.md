@@ -94,7 +94,7 @@ Scan the QR code with Expo Go on your phone.
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Supabase Dashboard → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Supabase Dashboard → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server only) | Supabase Dashboard → Settings → API |
-| `ANTHROPIC_API_KEY` | Claude API key | console.anthropic.com → API Keys |
+| `OPENCODE_API_KEY` | OpenCode API key (big-pickle model) | Provided by OpenCode |
 | `NEXT_PUBLIC_APP_URL` | Your app URL | Your deployment URL |
 
 ### Optional (for full features)

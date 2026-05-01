@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { canReceiveMessage } from '@/lib/plan-limits'
 import { sanitiseInput } from '@/lib/sanitise'
@@ -19,7 +19,7 @@ import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
 import { transmit } from '@/lib/syndicate/syndicate'
 import { searchKnowledge } from '@/lib/knowledge/knowledge-engine'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
@@ -312,35 +312,28 @@ export async function POST(req: NextRequest) {
           const agentT = agent.agent_type as string
           const shouldSearch = SEARCH_TYPES.includes(agentT) ||
             agentT.includes('research') || agentT.includes('market') || agentT.includes('competitor')
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const tools: any[] | undefined = shouldSearch
-            ? [{ type: 'web_search_20250305', name: 'web_search' }]
-            : undefined
 
-          const stream = anthropic.messages.stream({
+          const openaiMessages = [
+            { role: 'system' as const, content: systemPrompt },
+            ...messages.slice(-20).map(m => ({
+              role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
+              content: m.content
+            }))
+          ]
+
+          const stream = await openai.chat.completions.create({
             model,
             max_tokens: maxTokens,
-            system: systemPrompt,
-            messages: messages.slice(-20),
-            ...(tools && { tools }),
+            messages: openaiMessages,
+            stream: true,
           })
 
           const chunks: string[] = []
           for await (const chunk of stream) {
-            if (chunk.type === 'content_block_start') {
-              if ((chunk.content_block as { type: string }).type === 'tool_use') {
-                enqueue(`data: ${JSON.stringify({ searching: true })}\n\n`)
-              }
-            }
-            if (chunk.type === 'content_block_delta') {
-              const delta = chunk.delta
-              if (delta.type === 'text_delta') {
-                chunks.push(delta.text)
-                enqueue(`data: ${JSON.stringify({ text: delta.text })}\n\n`)
-              }
-            }
-            if (chunk.type === 'content_block_stop') {
-              enqueue(`data: ${JSON.stringify({ searching: false })}\n\n`)
+            const text = chunk.choices[0]?.delta?.content || ''
+            if (text) {
+              chunks.push(text)
+              enqueue(`data: ${JSON.stringify({ text })}\n\n`)
             }
           }
           agentResponse = chunks.join('')
@@ -591,8 +584,8 @@ export async function POST(req: NextRequest) {
 }
 
 async function verifyResponse(originalResponse: string, userMessage: string, agentType: string): Promise<void> {
-  const critique = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const critique = await openai.chat.completions.create({
+    model: 'claude-haiku-4-5',
     max_tokens: 100,
     messages: [{
       role: 'user',
@@ -602,7 +595,7 @@ Agent responded: ${originalResponse.slice(0, 400)}
 Is this accurate, helpful and appropriate? Reply only: PASS or FAIL: [brief reason]`,
     }],
   })
-  const result = critique.content[0].type === 'text' ? critique.content[0].text : 'PASS'
+  const result = critique.choices[0]?.message?.content || 'PASS'
   if (result.startsWith('FAIL')) {
     console.warn(`[Verify] FAIL — agent=${agentType} reason=${result}`)
   }
