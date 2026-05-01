@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!message.trim()) return err('Message required', 'VALIDATION_ERROR', 400)
 
   const config = (agent.config ?? {}) as Record<string, unknown>
-  const systemPrompt = config.system_prompt ?? `You are ${agent.display_name ?? 'an AI assistant'}. Be helpful, concise, and professional.`
+  const systemPrompt: string = typeof config.system_prompt === 'string' ? config.system_prompt : `You are ${agent.display_name ?? 'an AI assistant'}. Be helpful, concise, and professional.`
 
   const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
