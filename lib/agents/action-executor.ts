@@ -15,7 +15,7 @@ export type ActionType =
   | 'send_quote'
   | 'book_appointment'
 
-interface Action {
+export interface Action {
   type: ActionType
   payload: Record<string, any>
 }
