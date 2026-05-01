@@ -98,7 +98,7 @@ async function executeAction(
   }
 }
 
-async function sendCustomerProfileEmail(
+export async function sendCustomerProfileEmail(
   payload: any,
   context: { ownerEmail: string; contactIdentifier: string; conversationId: string },
 ): Promise<ActionResult> {
