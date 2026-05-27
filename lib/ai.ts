@@ -15,9 +15,9 @@ export function getAIClient(): OpenAI {
 }
 
 export const MODELS = {
-  fast: 'gemini-2.0-flash',
-  smart: 'gemini-2.5-pro',
-  embedding: 'text-embedding-004',
+  fast: 'gemini-flash-latest',
+  smart: 'gemini-2.5-flash',
+  embedding: 'gemini-embedding-2',
 }
 
 export function getModel(complexity: 'simple' | 'complex'): string {

@@ -58,7 +58,8 @@ export async function callClaude({
       model,
       estimatedCostPkr,
     }
-  } catch {
+  } catch (e) {
+    console.error('[AI Error]', e instanceof Error ? e.message : e)
     throw new Error('AI service temporarily unavailable. Please try again.')
   }
 }
