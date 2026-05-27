@@ -1,13 +1,13 @@
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu',
-  baseURL: 'https://opencode.ai/zen/v1',
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
 })
 
 export const MODELS = {
-  fast:     'claude-haiku-4-5',
-  smart:    'claude-sonnet-4-5',
+  fast:     'gemini-1.5-flash',
+  smart:    'gemini-1.5-pro',
   fallback: 'gpt-5',
 }
 
