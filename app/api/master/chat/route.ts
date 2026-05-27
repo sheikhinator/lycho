@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+const openai = getAIClient()
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

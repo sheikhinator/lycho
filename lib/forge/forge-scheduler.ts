@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { generateForgeBrief } from '@/lib/orion/forge-collaboration'
@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+const openai = getAIClient()
 
 // Global prompt — builds agents for businesses worldwide
 const FORGE_PROMPT = `Output ONLY a valid JSON array of 5 AI agent specs. No text before or after. No markdown.
@@ -25,7 +25,7 @@ type AnyAgent = Record<string, any>
 async function testAgentPrompt(prompt: string, agentType: string): Promise<boolean> {
   try {
     const response = await openai.chat.completions.create({
-      model: 'claude-haiku-4-5',
+      model: 'gemini-2.0-flash',
       max_tokens: 100,
       messages: [
         { role: 'system', content: prompt },
@@ -72,7 +72,7 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
   }
 
   const response = await openai.chat.completions.create({
-    model: 'claude-haiku-4-5',
+    model: 'gemini-2.0-flash',
     max_tokens: 1500,
     messages: [{
       role: 'user',

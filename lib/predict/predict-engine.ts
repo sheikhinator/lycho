@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+const openai = getAIClient()
 
 export async function detectColdLeads(): Promise<number> {
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
@@ -126,7 +126,7 @@ export async function generateProactiveInsight(tenantId: string): Promise<string
   const escalated  = recentConvos.filter(c => c.escalated).length
 
   const response = await openai.chat.completions.create({
-    model: 'claude-haiku-4-5',
+    model: 'gemini-2.0-flash',
     max_tokens: 200,
     messages: [{
       role: 'user',

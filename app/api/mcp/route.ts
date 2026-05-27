@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { injectIntelligence } from '@/lib/orion/orion-engine'
+import { getAIClient } from '@/lib/ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,13 +100,13 @@ export async function POST(request: Request) {
 
     const systemPrompt = await injectIntelligence(agentType, input?.country || 'PK')
 
-    const OpenAI = (await import('openai')).default
-    const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+    // OpenAI imported via getAIClient
+    const openai = getAIClient()
 
     const userMessage = input?.message || input?.query || input?.situation || JSON.stringify(input)
 
     const response = await openai.chat.completions.create({
-      model: 'claude-haiku-4-5',
+      model: 'gemini-2.0-flash',
       max_tokens: 1000,
       messages: [
         { role: 'system', content: systemPrompt },

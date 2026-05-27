@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/api'
-import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
-const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+const openai = getAIClient()
 
 export async function POST(request: Request) {
   const ctx = await getAuthContext()
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     : 50
 
   const response = await openai.chat.completions.create({
-    model: 'claude-sonnet-4-5',
+    model: 'gemini-2.5-pro',
     max_tokens: 800,
     messages: [{
       role: 'user',

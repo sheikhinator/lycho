@@ -11,7 +11,7 @@ export interface AgentCapability {
   can_process_payments:  boolean
   can_send_files:      boolean
   languages:           string[]
-  model:               'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
+  model:               'gemini-2.0-flash' | 'gemini-2.5-pro'
   avg_response_ms:     number
   max_tokens:          number
   use_cases:           string[]
@@ -30,7 +30,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          false,
     languages:               ['English', 'Urdu', 'Arabic'],
-    model:                   'claude-haiku-4-5-20251001',
+    model:                   'gemini-2.0-flash',
     avg_response_ms:         800,
     max_tokens:              600,
     use_cases:               [
@@ -58,7 +58,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English'],
-    model:                   'claude-sonnet-4-6',
+    model:                   'gemini-2.5-pro',
     avg_response_ms:         3500,
     max_tokens:              900,
     use_cases:               [
@@ -86,7 +86,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English', 'Urdu'],
-    model:                   'claude-haiku-4-5-20251001',
+    model:                   'gemini-2.0-flash',
     avg_response_ms:         900,
     max_tokens:              600,
     use_cases:               [
@@ -113,7 +113,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English', 'Urdu', 'Arabic'],
-    model:                   'claude-haiku-4-5-20251001',
+    model:                   'gemini-2.0-flash',
     avg_response_ms:         700,
     max_tokens:              600,
     use_cases:               [
@@ -140,7 +140,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English'],
-    model:                   'claude-sonnet-4-6',
+    model:                   'gemini-2.5-pro',
     avg_response_ms:         4000,
     max_tokens:              900,
     use_cases:               [
@@ -168,7 +168,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English'],
-    model:                   'claude-sonnet-4-6',
+    model:                   'gemini-2.5-pro',
     avg_response_ms:         5000,
     max_tokens:              900,
     use_cases:               [
@@ -196,7 +196,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapability> = {
     can_process_payments:    false,
     can_send_files:          true,
     languages:               ['English', 'Urdu', 'Arabic'],
-    model:                   'claude-haiku-4-5-20251001',
+    model:                   'gemini-2.0-flash',
     avg_response_ms:         1200,
     max_tokens:              600,
     use_cases:               [

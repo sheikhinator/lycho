@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 import { getAuthContext } from '@/lib/api'
 import { ok, err } from '@/lib/api'
 
@@ -9,10 +9,10 @@ export async function POST(request: Request) {
   const { description, sector, channels } = await request.json()
   if (!description) return err('Description required', 'MISSING_FIELD', 400)
 
-  const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+  const openai = getAIClient()
 
   const response = await openai.chat.completions.create({
-    model: 'claude-haiku-4-5',
+    model: 'gemini-2.0-flash',
     max_tokens: 1500,
     messages: [{
       role: 'user',

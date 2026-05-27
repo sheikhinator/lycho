@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import { getAIClient } from '@/lib/ai'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -15,10 +15,6 @@ function getSupabaseAdmin() {
   )
 }
 
-function getAnthropic() {
-  return new Anthropic({ apiKey: requireEnv('ANTHROPIC_API_KEY') })
-}
-
 // Capture a skill pattern from a successful conversation
 export async function captureSkill(
   agentType: string,
@@ -29,10 +25,10 @@ export async function captureSkill(
   if (leadScore < 70) return // only learn from high quality interactions
 
   try {
-    const anthropic = getAnthropic()
+    const openai = getAIClient()
     const supabaseAdmin = getSupabaseAdmin()
-    const extraction = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const extraction = await openai.chat.completions.create({
+      model: 'gemini-2.0-flash',
       max_tokens: 200,
       messages: [{
         role: 'user',
@@ -44,7 +40,7 @@ Agent: ${agentResponse.slice(0, 200)}`,
       }],
     })
 
-    const text = extraction.content[0].type === 'text' ? extraction.content[0].text : ''
+    const text = extraction.choices[0]?.message?.content || ''
     const clean = text.replace(/```json|```/g, '').trim()
     const skill = JSON.parse(clean)
 

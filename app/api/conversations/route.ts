@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import OpenAI from 'openai'
+import { getAIClient } from '@/lib/ai'
 import { getAuthContext, auditLog, ok, err, rateGuard } from '@/lib/api'
 import { canReceiveMessage } from '@/lib/plan-limits'
 import { sanitiseInput } from '@/lib/sanitise'
@@ -21,7 +21,7 @@ import { searchKnowledge } from '@/lib/knowledge/knowledge-engine'
 import { orchestrateResponse } from '@/lib/agents/master-agent'
 import { captureSkill, getAgentSkills } from '@/lib/evolve/evolve-engine'
 
-const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
+const openai = getAIClient()
 
 function normaliseType(agentType: string): string {
   return agentType.replace(/_agent$/, '')
@@ -602,7 +602,7 @@ export async function POST(req: NextRequest) {
 
 async function verifyResponse(originalResponse: string, userMessage: string, agentType: string): Promise<void> {
   const critique = await openai.chat.completions.create({
-    model: 'claude-haiku-4-5',
+    model: 'gemini-2.0-flash',
     max_tokens: 100,
     messages: [{
       role: 'user',

@@ -1,19 +1,4 @@
-import OpenAI from 'openai'
-
-function getOpenAI() {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is required.')
-  return new OpenAI({
-    apiKey,
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
-  })
-}
-
-export const MODELS = {
-  fast:     'gemini-1.5-flash',
-  smart:    'gemini-1.5-pro',
-  fallback: 'gpt-5',
-}
+import { getAIClient, MODELS } from '@/lib/ai'
 
 export function getModel(complexity: 'simple' | 'complex'): string {
   return complexity === 'simple' ? MODELS.fast : MODELS.smart
@@ -44,7 +29,7 @@ export async function callClaude({
   useCache = true,
 }: ClaudeCallParams): Promise<ClaudeResponse> {
   try {
-    const openai = getOpenAI()
+    const openai = getAIClient()
     const response = await openai.chat.completions.create({
       model,
       max_tokens: maxTokens,
