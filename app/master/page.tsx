@@ -102,14 +102,14 @@ export default function MasterPanel() {
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('lycho_master')
+    const saved = sessionStorage.getItem('master_auth')
     if (saved === process.env.NEXT_PUBLIC_MASTER_HINT) setAuthed(true)
   }, [])
 
   function login(e: React.FormEvent) {
     e.preventDefault()
     if (password === process.env.NEXT_PUBLIC_MASTER_HINT) {
-      sessionStorage.setItem('lycho_master', password)
+      sessionStorage.setItem('master_auth', password)
       setAuthed(true)
     } else {
       setError('Invalid password')
@@ -121,7 +121,7 @@ export default function MasterPanel() {
     setLoading(true)
     try {
       const res = await fetch(`/api/master/data?section=${s}`, {
-        headers: { 'x-master-secret': password || sessionStorage.getItem('lycho_master') || '' }
+        headers: { 'x-master-secret': password || sessionStorage.getItem('master_auth') || '' }
       })
       const json = await res.json()
       setData(json)
@@ -135,7 +135,7 @@ export default function MasterPanel() {
     try {
       const res = await fetch('/api/nexus/generate', {
         method: 'POST',
-        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+        headers: { 'x-master-secret': sessionStorage.getItem('master_auth') || '' }
       })
       const json = await res.json()
       if (json.success) {
@@ -157,7 +157,7 @@ export default function MasterPanel() {
     try {
       const res = await fetch('/api/forge/autonomous', {
         method: 'POST',
-        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+        headers: { 'x-master-secret': sessionStorage.getItem('master_auth') || '' }
       })
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No response body')
@@ -187,7 +187,7 @@ export default function MasterPanel() {
     try {
       const res = await fetch('/api/orion/optimise', {
         method: 'POST',
-        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+        headers: { 'x-master-secret': sessionStorage.getItem('master_auth') || '' }
       })
       const json = await res.json()
       if (json.success) {
@@ -208,7 +208,7 @@ export default function MasterPanel() {
     try {
       const res = await fetch('/api/orion/seed-countries', {
         method: 'POST',
-        headers: { 'x-master-secret': sessionStorage.getItem('lycho_master') || '' }
+        headers: { 'x-master-secret': sessionStorage.getItem('master_auth') || '' }
       })
       const json = await res.json()
       setOrionResult(json.success ? `✅ ${json.seeded}/${json.total} countries seeded` : `❌ ${json.error}`)
@@ -233,7 +233,7 @@ export default function MasterPanel() {
     try {
       const res = await fetch('/api/master/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-master-secret': sessionStorage.getItem('lycho_master') || '' },
+        headers: { 'Content-Type': 'application/json', 'x-master-secret': sessionStorage.getItem('master_auth') || '' },
         body: JSON.stringify({
           entity: chatEntity,
           message: msg,
@@ -383,7 +383,7 @@ export default function MasterPanel() {
                       <td style={{padding:'10px 12px'}}>
                         <button onClick={async()=>{
                           if(!confirm(`Permanently delete "${t.business_name}" (${t.business_email}) and all auth users? This cannot be undone.`)) return
-                          const res = await fetch(`/api/master/tenants/${t.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'purge'})})
+                          const res = await fetch(`/api/master/tenants/${t.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({action:'purge'})})
                           const json = await res.json()
                           if (!res.ok) { alert(`Delete failed: ${json.error}`); return }
                           loadSection('tenants')
@@ -402,7 +402,7 @@ export default function MasterPanel() {
                   <h2 style={{color:'#C9A84C',fontSize:24,fontWeight:900,letterSpacing:1}}>FORGE QUEUE</h2>
                   <div style={{display:'flex',gap:8}}>
                     <button onClick={async()=>{
-                      const res = await fetch('/api/agents/seed-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const res = await fetch('/api/agents/seed-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('master_auth')||''}})
                       const json = await res.json()
                       setForgeResult(json.errors?.length ? `⚠️ Seeded ${json.seeded}/${json.total} (${json.errors.length} errors)` : `✅ Seeded ${json.seeded} agents to marketplace`)
                     }} style={{background:'#1e1b4b',color:'#a78bfa',border:'1px solid #3730a3',borderRadius:8,padding:'8px 16px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
@@ -437,7 +437,7 @@ export default function MasterPanel() {
                     </div>
                     <div style={{display:'flex',gap:8}}>
                       <button onClick={async()=>{
-                        const res = await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'approve'})})
+                        const res = await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({action:'approve'})})
                         const json = await res.json()
                         if (!res.ok) { alert(`Approve failed: ${json.error}`); return }
                         loadSection('forge')
@@ -446,7 +446,7 @@ export default function MasterPanel() {
                       </button>
                       <button onClick={async()=>{
                         const notes = prompt('Rejection reason (optional):')
-                        await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'reject',notes})})
+                        await fetch(`/api/forge/queue/${agent.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({action:'reject',notes})})
                         loadSection('forge')
                       }} style={{background:'transparent',color:'#ef4444',border:'1px solid #7f1d1d',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer'}}>
                         Reject
@@ -490,7 +490,7 @@ export default function MasterPanel() {
                     {tmpl.why_useful && <div style={{color:'#888',fontSize:12,marginBottom:12,fontStyle:'italic'}}>{tmpl.why_useful}</div>}
                     <div style={{display:'flex',gap:8}}>
                       <button onClick={async()=>{
-                        const res = await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'approve'})})
+                        const res = await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({action:'approve'})})
                         const json = await res.json()
                         if (!res.ok) { alert(`Approve failed: ${json.error}`); return }
                         loadSection('nexus')
@@ -499,7 +499,7 @@ export default function MasterPanel() {
                       </button>
                       <button onClick={async()=>{
                         const notes = prompt('Rejection reason (optional):')
-                        await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({action:'reject',notes})})
+                        await fetch(`/api/nexus/queue/${tmpl.id}`,{method:'PUT',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({action:'reject',notes})})
                         loadSection('nexus')
                       }} style={{background:'transparent',color:'#ef4444',border:'1px solid #7f1d1d',borderRadius:6,padding:'6px 16px',fontSize:13,cursor:'pointer'}}>
                         Reject
@@ -611,7 +611,7 @@ export default function MasterPanel() {
                   </div>
                   <div style={{display:'flex',gap:8}}>
                     <button onClick={async()=>{
-                      const res = await fetch('/api/syndicate/register-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const res = await fetch('/api/syndicate/register-all',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('master_auth')||''}})
                       const json = await res.json()
                       alert(json.error ? `Error: ${json.error}` : `Registered ${json.registered}/${json.total} agents, ${json.routes_added} cross-sector routes added`)
                       loadSection('syndicate')
@@ -619,7 +619,7 @@ export default function MasterPanel() {
                       Register All Agents
                     </button>
                     <button onClick={async()=>{
-                      const res = await fetch('/api/syndicate/seed',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('lycho_master')||''}})
+                      const res = await fetch('/api/syndicate/seed',{method:'POST',headers:{'x-master-secret':sessionStorage.getItem('master_auth')||''}})
                       const json = await res.json()
                       if(json.success){alert(`Seeded: ${json.routes_seeded} routes, ${json.agents_seeded} agents`);loadSection('syndicate')}
                       else alert(`Error: ${json.error}`)
@@ -665,7 +665,7 @@ export default function MasterPanel() {
                         </td>
                         <td style={{padding:'8px 10px'}}>
                           <button onClick={async()=>{
-                            await fetch('/api/syndicate/routes',{method:'PATCH',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({id:r.id,active:!r.active})})
+                            await fetch('/api/syndicate/routes',{method:'PATCH',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({id:r.id,active:!r.active})})
                             loadSection('syndicate')
                           }} style={{background:'transparent',color:r.active?'#ef4444':'#34d399',border:`1px solid ${r.active?'#7f1d1d':'#065f46'}`,borderRadius:5,padding:'3px 10px',fontSize:11,cursor:'pointer'}}>
                             {r.active?'Disable':'Enable'}
@@ -695,7 +695,7 @@ export default function MasterPanel() {
               </div>
             )}
             {section === 'agent-status' && (
-              <AgentStatusSection secret={password || (typeof window !== 'undefined' ? sessionStorage.getItem('lycho_master') || '' : '')} />
+              <AgentStatusSection secret={password || (typeof window !== 'undefined' ? sessionStorage.getItem('master_auth') || '' : '')} />
             )}
             {section === 'payments' && (
               <div>
@@ -719,7 +719,7 @@ export default function MasterPanel() {
                       <td style={{padding:'10px 12px'}}>
                         {p.status==='pending' && (
                           <button onClick={async()=>{
-                            await fetch('/api/master/activate',{method:'POST',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('lycho_master')||''},body:JSON.stringify({tenant_id:p.tenant_id,plan:p.plan,billing_cycle:p.billing_cycle,payment_request_id:p.id})})
+                            await fetch('/api/master/activate',{method:'POST',headers:{'Content-Type':'application/json','x-master-secret':sessionStorage.getItem('master_auth')||''},body:JSON.stringify({tenant_id:p.tenant_id,plan:p.plan,billing_cycle:p.billing_cycle,payment_request_id:p.id})})
                             loadSection('payments')
                           }} style={{background:'#064e3b',color:'#34d399',border:'1px solid #065f46',borderRadius:6,padding:'4px 12px',fontSize:12,cursor:'pointer',fontWeight:600}}>
                             ✅ Activate
