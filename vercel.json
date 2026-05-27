@@ -6,6 +6,7 @@
     {"path": "/api/cron/expire-trials", "schedule": "0 0 * * *"},
     {"path": "/api/predict/run", "schedule": "0 6 * * *"},
     {"path": "/api/compete/brief", "schedule": "0 7 * * 1"},
-    {"path": "/api/scout/run", "schedule": "0 20 * * *"}
+    {"path": "/api/scout/run", "schedule": "0 20 * * *"},
+    {"path": "/api/evolve", "schedule": "0 3 * * *"}
   ]
 }

@@ -19,6 +19,7 @@ import { detectComplexity, conveneCouncil } from '@/lib/orion/agent-council'
 import { transmit } from '@/lib/syndicate/syndicate'
 import { searchKnowledge } from '@/lib/knowledge/knowledge-engine'
 import { orchestrateResponse } from '@/lib/agents/master-agent'
+import { captureSkill, getAgentSkills } from '@/lib/evolve/evolve-engine'
 
 const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
@@ -237,6 +238,7 @@ export async function POST(req: NextRequest) {
     hasProfile ? existingProfile : null,
   )
   const model = getModel(promptModel)
+  const learnedSkills = await getAgentSkills(agent.agent_type as string)
 
   // 5e. Guardian security check (non-blocking)
   try {
@@ -319,8 +321,11 @@ export async function POST(req: NextRequest) {
             try { orionPrompt = await injectIntelligence(agent.agent_type, countryCode, basePrompt) } catch {}
 
             const systemPrompt = extraContext ? `${orionPrompt}\n\n${extraContext}` : orionPrompt
+            const evolvedSystemPrompt = learnedSkills
+              ? `${systemPrompt}\n\n${learnedSkills}`
+              : systemPrompt
             const openaiMessages = [
-              { role: 'system' as const, content: systemPrompt },
+              { role: 'system' as const, content: evolvedSystemPrompt },
               ...messages.slice(-20).map(m => ({
                 role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
                 content: m.content
@@ -557,6 +562,11 @@ export async function POST(req: NextRequest) {
             sentiment: metadata?.sentiment ?? 'neutral',
             resolved: false
           }).catch(e => console.error('Orion scoring error:', e))
+
+          if (leadScore >= 70) {
+            captureSkill(agent.agent_type as string, body.message, cleanResponse, leadScore)
+              .catch(e => console.error('Skill capture:', e))
+          }
 
           await auditLog(supabase, {
             tenantId,
