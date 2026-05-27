@@ -2,9 +2,13 @@ import { Resend } from 'resend'
 import { render } from '@react-email/render'
 import React from 'react'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = 'LYCHO <alerts@lycho.ai>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.vercel.app'
+
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 export async function sendFeedbackReceived(
   ownerEmail: string,
@@ -14,6 +18,8 @@ export async function sendFeedbackReceived(
   rating?: number,
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const html = await render(
       React.createElement(
         'div',

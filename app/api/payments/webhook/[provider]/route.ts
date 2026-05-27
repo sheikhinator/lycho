@@ -4,8 +4,12 @@ import { verifySafepayWebhook } from '@/lib/payments/safepay'
 import { verifyXpayWebhook } from '@/lib/payments/xpay'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = 'LYCHO <alerts@lycho.ai>'
+
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 // Always return 200 to webhooks — even on error — so providers don't retry
 function webhook200(msg = 'ok') {
@@ -87,7 +91,8 @@ export async function POST(
       .eq('id', tenantId)
       .single()
 
-    if (tenantRow?.business_email) {
+    const resend = getResendClient()
+    if (tenantRow?.business_email && resend) {
       await resend.emails.send({
         from: FROM,
         to: tenantRow.business_email,

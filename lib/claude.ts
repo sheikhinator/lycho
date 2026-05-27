@@ -1,9 +1,13 @@
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
-})
+function getOpenAI() {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY is required.')
+  return new OpenAI({
+    apiKey,
+    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+  })
+}
 
 export const MODELS = {
   fast:     'gemini-1.5-flash',
@@ -40,6 +44,7 @@ export async function callClaude({
   useCache = true,
 }: ClaudeCallParams): Promise<ClaudeResponse> {
   try {
+    const openai = getOpenAI()
     const response = await openai.chat.completions.create({
       model,
       max_tokens: maxTokens,

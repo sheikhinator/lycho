@@ -3,7 +3,10 @@ import { getAuthContext, ok, err } from '@/lib/api'
 import { createAdminClient } from '@/lib/supabase'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 // POST /api/payments/manual — submit a manual payment request
 export async function POST(req: NextRequest) {
@@ -60,7 +63,8 @@ export async function POST(req: NextRequest) {
   const masterEmail = process.env.MASTER_EMAIL
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
-  if (masterEmail && process.env.RESEND_API_KEY) {
+  const resend = getResendClient()
+  if (masterEmail && resend) {
     await resend.emails.send({
       from:    'LYCHO Payments <payments@lycho.ai>',
       to:      masterEmail,

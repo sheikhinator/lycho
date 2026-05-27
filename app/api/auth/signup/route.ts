@@ -2,14 +2,23 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is required.`)
+  return value
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(request: Request) {
   try {
+    const supabaseAdmin = getSupabaseAdmin()
     const body = await request.json()
     const { businessName, email, password, phone, sector, country } = body
 
@@ -74,7 +83,9 @@ export async function POST(request: Request) {
 
     // Step 4: Send welcome email via Resend (non-blocking)
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY)
+      const resendKey = process.env.RESEND_API_KEY
+      if (!resendKey) throw new Error('RESEND_API_KEY is required.')
+      const resend = new Resend(resendKey)
       await resend.emails.send({
         from: 'LYCHO <onboarding@resend.dev>',
         to: email,

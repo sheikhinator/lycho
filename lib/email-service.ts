@@ -8,9 +8,13 @@ import { WeeklyROI } from './email-templates/weekly-roi'
 import { CustomerProfileEmail } from './email-templates/customer-profile'
 import React from 'react'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = 'LYCHO <alerts@lycho.ai>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.vercel.app'
+
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 export async function sendHotLeadAlert(
   ownerEmail: string,
@@ -25,6 +29,8 @@ export async function sendHotLeadAlert(
   channel = 'unknown',
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const html = await render(
       React.createElement(HotLeadAlert, {
         businessName,
@@ -58,6 +64,8 @@ export async function sendEscalationAlert(
   conversationSnippet: any[] = [],
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const html = await render(
       React.createElement(EscalationAlert, {
         businessName,
@@ -91,6 +99,8 @@ export async function sendDailyDigest(
   },
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const date = new Date().toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     })
@@ -119,6 +129,8 @@ export async function sendTrialExpiry(
   daysRemaining: number,
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const html = await render(
       React.createElement(TrialExpiry, {
         businessName,
@@ -154,6 +166,8 @@ export async function sendWeeklyROI(
   }>,
 ): Promise<void> {
   try {
+    const resend = getResendClient()
+    if (!resend) return
     const now = new Date()
     const weekStart = new Date(now)
     weekStart.setDate(now.getDate() - 7)

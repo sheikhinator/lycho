@@ -3,11 +3,19 @@ import { getAuthContext, ok, err } from '@/lib/api'
 import { ingestDocument } from '@/lib/knowledge/knowledge-engine'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is required.`)
+  return value
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 // GET /api/knowledge — list documents for tenant (grouped by name)
 export async function GET() {
@@ -16,6 +24,7 @@ export async function GET() {
   if (!ctx.tenantId) return err('No tenant', 'NO_TENANT', 403)
 
   const { tenantId } = ctx
+  const supabaseAdmin = getSupabaseAdmin()
 
   const { data, error } = await supabaseAdmin
     .from('knowledge_documents')

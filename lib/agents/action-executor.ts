@@ -1,7 +1,10 @@
 import { Resend } from 'resend'
 import { createAdminClient } from '@/lib/supabase'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 // Action types that agents can execute
 export type ActionType =
@@ -103,6 +106,8 @@ export async function sendCustomerProfileEmail(
   context: { ownerEmail: string; contactIdentifier: string; conversationId: string },
 ): Promise<ActionResult> {
   try {
+    const resend = getResendClient()
+    if (!resend) return { success: false, message: 'RESEND_API_KEY is not configured' }
     const { customerName, profile, queries, sentiment, leadScore } = payload
 
     await resend.emails.send({
@@ -229,6 +234,8 @@ async function escalateToHuman(
   context: { tenantId: string; conversationId: string; ownerEmail: string },
   supabase: any,
 ): Promise<ActionResult> {
+  const resend = getResendClient()
+  if (!resend) return { success: false, message: 'RESEND_API_KEY is not configured' }
   const { reason, priority = 'high' } = payload
 
   await supabase
@@ -283,6 +290,8 @@ async function sendQuote(
   payload: any,
   context: { ownerEmail: string; contactIdentifier: string },
 ): Promise<ActionResult> {
+  const resend = getResendClient()
+  if (!resend) return { success: false, message: 'RESEND_API_KEY is not configured' }
   const { quote_details, customer_name } = payload
 
   await resend.emails.send({

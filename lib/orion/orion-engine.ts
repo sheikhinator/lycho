@@ -1,11 +1,19 @@
 import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is required.`)
+  return value
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 const openai = new OpenAI({ apiKey: process.env.OPENCODE_API_KEY || 'sk-DkKhm5mvzbJQHPhVyAbDBKVbDQgKuq5e6bTxTHW9jcRHa50tW3P9ax4oEsDv3buu', baseURL: 'https://opencode.ai/zen/v1' })
 
@@ -18,6 +26,7 @@ export async function injectIntelligence(
   countryCode: string = 'PK',
   basePrompt?: string
 ): Promise<string> {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: existing } = await supabaseAdmin
     .from('orion_agent_intelligence')
     .select('*')
@@ -104,6 +113,7 @@ export async function scoreConversation(
     resolved: boolean
   }
 ): Promise<number> {
+  const supabaseAdmin = getSupabaseAdmin()
   void messages
   let score = 50
   if (metadata.resolved) score += 20
@@ -148,6 +158,7 @@ export async function scoreConversation(
 
 export async function runNightlyOptimisation(): Promise<{ optimised: number }> {
   console.log('=== ORION OPTIMISATION STARTING ===')
+  const supabaseAdmin = getSupabaseAdmin()
 
   const { data: agents } = await supabaseAdmin
     .from('orion_agent_intelligence')
@@ -257,6 +268,7 @@ export async function applyGeoIntelligence(
   tenantId: string,
   countryCode: string
 ): Promise<{ agents_updated: number }> {
+  const supabaseAdmin = getSupabaseAdmin()
   const { data: country } = await supabaseAdmin
     .from('country_profiles')
     .select('*')

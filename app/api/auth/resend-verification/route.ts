@@ -2,8 +2,6 @@ import { createAdminClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
@@ -14,6 +12,11 @@ export async function POST(request: NextRequest) {
     const normalised = email.trim().toLowerCase()
     const admin = createAdminClient()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lycho.app'
+    const resendApiKey = process.env.RESEND_API_KEY
+    if (!resendApiKey) {
+      return NextResponse.json({ error: 'Email service is not configured.' }, { status: 500 })
+    }
+    const resend = new Resend(resendApiKey)
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',

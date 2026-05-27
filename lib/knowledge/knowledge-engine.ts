@@ -1,16 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} is required.`)
+  return value
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const apiKey = requireEnv('OPENAI_API_KEY')
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ model: 'text-embedding-3-small', input: text })
@@ -43,6 +52,7 @@ export async function ingestDocument(
   sourceType: 'upload' | 'url' = 'upload',
   sourceUrl?: string
 ): Promise<{ chunks: number }> {
+  const supabaseAdmin = getSupabaseAdmin()
   const chunks = chunkText(content)
   let inserted = 0
 
@@ -73,6 +83,7 @@ export async function searchKnowledge(
   limit = 3
 ): Promise<string> {
   try {
+    const supabaseAdmin = getSupabaseAdmin()
     const queryEmbedding = await generateEmbedding(query)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

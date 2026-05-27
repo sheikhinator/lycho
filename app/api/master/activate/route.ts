@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 // POST /api/master/activate — activate a tenant's plan (MASTER_SECRET required)
 export async function POST(req: NextRequest) {
@@ -59,7 +62,8 @@ export async function POST(req: NextRequest) {
     .eq('id', body.tenant_id)
     .single()
 
-  if (tenant?.business_email && process.env.RESEND_API_KEY) {
+  const resend = getResendClient()
+  if (tenant?.business_email && resend) {
     await resend.emails.send({
       from:    'LYCHO <hello@lycho.ai>',
       to:      tenant.business_email,

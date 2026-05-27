@@ -3,7 +3,10 @@ import { ok, err } from '@/lib/api'
 import { createAdminClient } from '@/lib/supabase'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY
+  return apiKey ? new Resend(apiKey) : null
+}
 
 function checkMasterSecret(req: NextRequest): boolean {
   const secret = process.env.MASTER_SECRET
@@ -79,7 +82,8 @@ export async function PUT(
 
   // Send confirmation email to master
   const masterEmail = process.env.MASTER_EMAIL
-  if (masterEmail && process.env.RESEND_API_KEY) {
+  const resend = getResendClient()
+  if (masterEmail && resend) {
     await resend.emails.send({
       from: 'LYCHO Forge <onboarding@resend.dev>',
       to:   masterEmail,
