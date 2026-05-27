@@ -106,12 +106,22 @@ export default function MasterPanel() {
     if (saved === process.env.NEXT_PUBLIC_MASTER_HINT) setAuthed(true)
   }, [])
 
-  function login(e: React.FormEvent) {
+  async function login(e: React.FormEvent) {
     e.preventDefault()
-    if (password === process.env.NEXT_PUBLIC_MASTER_HINT) {
-      sessionStorage.setItem('master_auth', password)
-      setAuthed(true)
-    } else {
+    try {
+      const res = await fetch('/api/master/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      })
+      const json = await res.json()
+      if (res.ok && json.ok) {
+        sessionStorage.setItem('master_auth', password)
+        setAuthed(true)
+      } else {
+        setError('Invalid password')
+      }
+    } catch (err) {
       setError('Invalid password')
     }
   }
