@@ -97,7 +97,7 @@ export async function runAutonomousForge(): Promise<{ agents_queued: number }> {
 
   if (!agents.length) {
     console.error('Parse failed. Raw:', cleaned)
-    throw new Error('Could not parse Claude response')
+    throw new Error('Could not parse Gemini response')
   }
 
   const novel = agents.filter((a: AnyAgent) =>

@@ -64,7 +64,7 @@ export default function MasterForgePage() {
         headers: { 'x-master-secret': getSecret() },
       })
       const json = await res.json()
-      setRunResult(`Queued ${json.data?.agents_queued ?? 0} new agents`)
+      setRunResult(`Queued ${json.agents_queued ?? 0} new agents`)
       fetchEntries()
     } catch {
       setRunResult('Error running Forge')
