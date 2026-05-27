@@ -20,7 +20,7 @@ export interface Action {
   payload: Record<string, any>
 }
 
-interface ActionResult {
+export interface ActionResult {
   success: boolean
   message: string
   data?: any
