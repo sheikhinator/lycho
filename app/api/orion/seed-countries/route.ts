@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { admin } from '@/lib/admin'
 import { COUNTRY_PROFILES } from '@/lib/orion/country-profiles'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const supabaseAdmin = admin()
 
 export const dynamic = 'force-dynamic'
 

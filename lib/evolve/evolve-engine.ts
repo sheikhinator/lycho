@@ -28,7 +28,7 @@ export async function captureSkill(
     const openai = getAIClient()
     const supabaseAdmin = getSupabaseAdmin()
     const extraction = await openai.chat.completions.create({
-      model: 'gemini-2.0-flash',
+      model: '',
       max_tokens: 200,
       messages: [{
         role: 'user',

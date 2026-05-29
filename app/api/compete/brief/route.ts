@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/api'
 import { generateCompetitorBrief } from '@/lib/compete/compete-engine'
-import { createClient } from '@supabase/supabase-js'
+import { admin } from '@/lib/admin'
 
 export const dynamic = 'force-dynamic'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const supabaseAdmin = admin()
 
 // GET — return cached brief from scout_reports if < 7 days old
 export async function GET() {

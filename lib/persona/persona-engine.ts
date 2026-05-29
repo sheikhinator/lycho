@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { admin } from '@/lib/admin'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const supabaseAdmin = admin()
 
 export const DEFAULT_PERSONAS = [
   { agent_type: 'intake',      display_name: 'Intake Agent',      personality: 'Warm, curious, empathetic. Makes everyone feel heard immediately.',          communication_style: 'Asks one clear question at a time. Never overwhelming.',              tone: 'Friendly and professional',  catchphrase: 'Tell me more about that.',                     sprite_color: '#4ade80' },

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { admin } from '@/lib/admin'
 import { ALL_AGENTS_PROMPTS, ALL_AGENTS_META } from '@/lib/agents/all-agents'
 
 export const dynamic = 'force-dynamic'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const supabaseAdmin = admin()
 
 export async function POST(req: NextRequest) {
   if (req.headers.get('x-master-secret') !== process.env.MASTER_SECRET) {
