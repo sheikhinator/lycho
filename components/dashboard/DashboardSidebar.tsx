@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, MessageSquare, Zap,
-  Store, CreditCard, Settings, Code2, Wand2, BarChart2, Network, MessagesSquare, BookOpen, Eye, TrendingUp, Cpu, Wrench, Terminal, Palette,
+  Store, CreditCard, Settings, Code2, Wand2, BarChart2, Network, MessagesSquare, BookOpen, Eye, TrendingUp, Cpu, Wrench, Terminal, Palette, Shield,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { useSidebar } from '@/components/providers/SidebarContext'
@@ -27,6 +27,7 @@ const NAV = [
   { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'    },
   { icon: BookOpen,        label: 'Knowledge',     href: '/dashboard/knowledge'      },
   { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'        },
+  { icon: Shield,          label: 'Audit Log',     href: '/dashboard/audit'          },
   { icon: Settings,        label: 'Settings',      href: '/dashboard/settings'       },
   { icon: Code2,           label: 'API',           href: '/developers'               },
 ]
