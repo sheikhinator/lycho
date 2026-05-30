@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Bot, MessageSquare, Zap,
-  Store, CreditCard, Settings, Code2, Wand2, BarChart2, Network, MessagesSquare, BookOpen, Eye, TrendingUp, Cpu, Wrench, Terminal, Palette, Shield,
+  Store, CreditCard, Settings, Code2, Wand2, BarChart2, Network, MessagesSquare, BookOpen, Eye, TrendingUp, Cpu, Wrench, Terminal, Palette, Shield, Brain, Activity, Key, Sparkles, GraduationCap, Users, Workflow, Globe, Webhook, FlaskConical, Database,
 } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { useSidebar } from '@/components/providers/SidebarContext'
@@ -19,11 +19,22 @@ const NAV = [
   { icon: Network,         label: 'Syndicate',     href: '/dashboard/syndicate'      },
   { icon: BarChart2,       label: 'Analytics',     href: '/dashboard/analytics'      },
   { icon: Eye,             label: 'Observe',       href: '/dashboard/observe'        },
+  { icon: Sparkles,        label: 'Oracle',        href: '/dashboard/oracle'         },
   { icon: TrendingUp,      label: 'Compete',       href: '/dashboard/compete'        },
+  { icon: Brain,           label: 'Swarm',         href: '/dashboard/swarm'          },
   { icon: Cpu,             label: 'Simulate',      href: '/dashboard/simulate'       },
+  { icon: Activity,        label: 'Heal',          href: '/dashboard/heal'           },
+  { icon: GraduationCap,   label: 'Training',      href: '/dashboard/training'       },
+  { icon: Users,           label: 'Collab',        href: '/dashboard/collab'         },
+  { icon: Workflow,        label: 'Workflows',     href: '/dashboard/workflows'      },
+  { icon: Globe,           label: 'Portal',        href: '/dashboard/portal'         },
   { icon: Palette,         label: 'Studio',        href: '/dashboard/studio'         },
   { icon: Wrench,          label: 'Skills',        href: '/dashboard/skills'         },
   { icon: Terminal,        label: 'Dev',           href: '/dashboard/dev'            },
+  { icon: Key,             label: 'Gateway',       href: '/dashboard/gateway'        },
+  { icon: Webhook,         label: 'Webhooks',      href: '/dashboard/webhooks'       },
+  { icon: FlaskConical,    label: 'A/B Tests',     href: '/dashboard/abtesting'      },
+  { icon: Database,        label: 'Backup',        href: '/dashboard/backup'         },
   { icon: Store,           label: 'Marketplace',   href: '/dashboard/marketplace'    },
   { icon: BookOpen,        label: 'Knowledge',     href: '/dashboard/knowledge'      },
   { icon: CreditCard,      label: 'Billing',       href: '/dashboard/billing'        },

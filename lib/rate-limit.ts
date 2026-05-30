@@ -64,5 +64,17 @@ export async function checkRateLimit(
   return null
 }
 
+export async function rateLimit(key: string, limit: number = 60, windowSec: number = 60): Promise<boolean> {
+  const redis = getRedis()
+  if (!redis) return true
+  try {
+    const count = await redis.incr(key)
+    if (count === 1) await redis.expire(key, windowSec)
+    return count <= limit
+  } catch {
+    return true
+  }
+}
+
 export type { RateLimitOptions }
 export { AUTH_LIMITS, DEFAULTS as DEFAULT_LIMITS }

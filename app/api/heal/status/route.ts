@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthContext } from '@/lib/api'
-import { getAgentAnalytics, getDashboardSummary } from '@/lib/analytics/agent-analytics'
+import { checkAgentHealth, scanAllAgents } from '@/lib/heal/heal-engine'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +13,14 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const agentType = searchParams.get('agent_type')
-    const period = (searchParams.get('period') as '24h' | '7d' | '30d' | 'all') || '7d'
 
     if (agentType) {
-      const analytics = await getAgentAnalytics(agentType, period)
-      return NextResponse.json({ analytics })
+      const health = await checkAgentHealth(agentType)
+      return NextResponse.json(health)
     }
 
-    const summary = await getDashboardSummary(ctx.tenantId)
-    return NextResponse.json(summary)
+    const scan = await scanAllAgents()
+    return NextResponse.json(scan)
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
