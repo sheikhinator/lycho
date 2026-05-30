@@ -53,7 +53,7 @@ export async function createBackup(
 
   if (type === 'full' || type === 'knowledge') {
     const { count: docCount } = await supabase
-      .from('knowledge_docs').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+      .from('knowledge_documents').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId)
     metadata.knowledge_doc_count = docCount || 0
   }
 
@@ -180,8 +180,8 @@ async function captureSnapshot(
 
   if (type === 'full' || type === 'knowledge') {
     const { data: docs } = await supabase
-      .from('knowledge_docs').select('*').eq('tenant_id', tenantId)
-    if (docs) snapshot.knowledge_docs = docs
+      .from('knowledge_documents').select('*').eq('tenant_id', tenantId)
+    if (docs) snapshot.knowledge_documents = docs
   }
 
   return snapshot

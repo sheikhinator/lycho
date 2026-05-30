@@ -95,14 +95,19 @@ export async function GET(request: Request) {
       supabase.from('agent_registry').select('*').order('category')
     ])
     const allMsgs = msgs.data || []
-    const todayMsgs = allMsgs.filter((m: Record<string, string>) => new Date(m.created_at) >= today)
-    const blocked = allMsgs.filter((m: Record<string, boolean>) => m.flagged_by_guardian)
-    const avgQ = allMsgs.filter((m: Record<string, number>) => m.quality_score).length
-      ? Math.round(allMsgs.filter((m: Record<string, number>) => m.quality_score).reduce((s: number, m: Record<string, number>) => s + m.quality_score, 0) / allMsgs.filter((m: Record<string, number>) => m.quality_score).length)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const todayMsgs = allMsgs.filter((m: any) => new Date(m.created_at) >= today)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blocked = allMsgs.filter((m: any) => m.flagged_by_guardian)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scored = allMsgs.filter((m: any) => m.quality_score)
+    const avgQ = scored.length
+      ? Math.round(scored.reduce((s: number, m: any) => s + m.quality_score, 0) / scored.length)
       : 0
     // Most active pair
     const pairCounts: Record<string, number> = {}
-    allMsgs.forEach((m: Record<string, string>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allMsgs.forEach((m: any) => {
       const key = `${m.from_agent} ↔ ${m.to_agent}`
       pairCounts[key] = (pairCounts[key] || 0) + 1
     })
@@ -114,7 +119,8 @@ export async function GET(request: Request) {
       messages_today: todayMsgs.length,
       guardian_blocks: blocked.length,
       avg_quality: avgQ,
-      active_routes: (routes.data || []).filter((r: Record<string, boolean>) => r.active).length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      active_routes: (routes.data || []).filter((r: any) => r.active).length,
       total_routes: routes.data?.length || 0,
       top_pair: topPair ? `${topPair[0]} (${topPair[1]} msgs)` : 'No traffic yet'
     })

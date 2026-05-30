@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { getAIClient } from '@/lib/ai'
+import { getAIClient, getModel } from '@/lib/ai'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -28,7 +28,7 @@ export async function generatePrediction(tenantId: string): Promise<string> {
   if (!tenant) return 'No tenant data found.'
 
   const completion = await openai.chat.completions.create({
-    model: '',
+    model: getModel('simple'),
     max_tokens: 300,
     messages: [{
       role: 'user',
