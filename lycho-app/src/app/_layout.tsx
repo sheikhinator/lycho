@@ -31,7 +31,9 @@ function Gate() {
     if (!ready || error) return
     const first = segments[0] as string | undefined
     const authScreens = ['sign-in', 'signup', 'forgot']
-    if (!user && !authScreens.includes(first ?? '')) router.replace('/sign-in')
+    // Signed out: the only valid starting screen is sign-in. Reset/sign-up are reachable only from it,
+    // so if we ever land on them with nothing to go back to, jump to sign-in.
+    if (!user && (!authScreens.includes(first ?? '') || (first !== 'sign-in' && !router.canGoBack()))) router.replace('/sign-in')
     else if (user && locked && first !== 'lock') router.replace('/lock')
     else if (user && !locked && (first === undefined || authScreens.includes(first) || first === 'lock')) router.replace('/')
   }, [ready, error, user, locked, segments])

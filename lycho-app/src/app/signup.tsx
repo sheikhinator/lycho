@@ -53,7 +53,7 @@ export default function SignUpScreen() {
   return (
     <Screen scroll edges={['top', 'bottom']}>
       <KeyboardAvoidingView behavior="padding">
-        <Header back kicker={first ? 'Owner' : 'New account'} title={first ? 'Master account' : 'Create account'} />
+        <Header back backTo="/sign-in" kicker={first ? 'Owner' : 'New account'} title={first ? 'Master account' : 'Create account'} />
         {first ? (
           <Card gold style={{ marginBottom: S.lg }}>
             <T>The first account on this phone is the master account. Only it can open the Master Panel and manage other accounts.</T>

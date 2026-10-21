@@ -21,11 +21,11 @@ export default function ForgotScreen() {
   return (
     <Screen scroll edges={['top', 'bottom']}>
       <KeyboardAvoidingView behavior="padding">
-        <Header back kicker="Account" title="Reset password" />
+        <Header back backTo="/sign-in" kicker="Account" title="Reset password" />
         {done ? (
           <Card gold>
             <T>Password updated. A new recovery code was created — you can see it in Settings → Security after signing in.</T>
-            <Btn title="Back to sign in" style={{ marginTop: S.lg }} onPress={() => router.back()} />
+            <Btn title="Back to sign in" style={{ marginTop: S.lg }} onPress={() => router.replace('/sign-in')} />
           </Card>
         ) : (
           <>
@@ -35,6 +35,7 @@ export default function ForgotScreen() {
             <Field label="New password" value={password} onChangeText={setPassword} secureTextEntry />
             {error ? <T style={{ color: C.red, marginBottom: S.md }}>{error}</T> : null}
             <Btn title="Reset password" onPress={submit} loading={busy} disabled={!email || !code || !password} />
+            <Btn title="Back to sign in" variant="ghost" style={{ marginTop: S.md }} onPress={() => router.replace('/sign-in')} />
           </>
         )}
       </KeyboardAvoidingView>

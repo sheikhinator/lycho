@@ -31,11 +31,11 @@ export function Screen({ children, scroll = false, pad = true, edges = ['top'] a
   )
 }
 
-export function Header({ title, kicker, back, right }: { title: string; kicker?: string; back?: boolean; right?: React.ReactNode }) {
+export function Header({ title, kicker, back, backTo = '/', right }: { title: string; kicker?: string; back?: boolean; backTo?: string; right?: React.ReactNode }) {
   return (
     <View style={st.header}>
       {back && (
-        <Pressable hitSlop={12} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ marginRight: S.md }}>
+        <Pressable hitSlop={12} onPress={() => (router.canGoBack() ? router.back() : router.replace(backTo as any))} style={{ marginRight: S.md }}>
           <Icon name="arrow-left" size={22} />
         </Pressable>
       )}
