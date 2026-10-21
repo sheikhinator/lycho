@@ -58,6 +58,37 @@ const MIGRATIONS: string[] = [
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, user_id TEXT, action TEXT NOT NULL, detail TEXT
   );
   `,
+  // v2 — the full platform (knowledge, memory graph, personas, engines, scout/sense, labs, tools, traces)
+  `
+  ALTER TABLE messages ADD COLUMN rating INTEGER;
+  ALTER TABLE messages ADD COLUMN trace_id TEXT;
+  ALTER TABLE agents ADD COLUMN persona_id TEXT;
+  ALTER TABLE agents ADD COLUMN elo REAL NOT NULL DEFAULT 1000;
+  ALTER TABLE agents ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE memories ADD COLUMN entity TEXT;
+  ALTER TABLE memories ADD COLUMN source TEXT;
+  CREATE TABLE IF NOT EXISTS knowledge_docs (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL, source TEXT, kind TEXT NOT NULL, chars INTEGER NOT NULL, embedded INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS knowledge_chunks (id TEXT PRIMARY KEY NOT NULL, doc_id TEXT NOT NULL, idx INTEGER NOT NULL, content TEXT NOT NULL, embedding TEXT);
+  CREATE INDEX IF NOT EXISTS idx_chunks_doc ON knowledge_chunks(doc_id);
+  CREATE TABLE IF NOT EXISTS personas (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, tone TEXT NOT NULL, style TEXT NOT NULL, rules TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS agent_versions (id TEXT PRIMARY KEY NOT NULL, agent_id TEXT NOT NULL, version INTEGER NOT NULL, prompt TEXT NOT NULL, reason TEXT, engine TEXT NOT NULL, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS engine_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, engine TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER, ok INTEGER, summary TEXT);
+  CREATE TABLE IF NOT EXISTS forge_proposals (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, sector TEXT NOT NULL, role TEXT NOT NULL, prompt TEXT NOT NULL, reason TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS syndicate (id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, from_agent TEXT, to_agent TEXT NOT NULL, content TEXT NOT NULL, reply TEXT, ref TEXT, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS workflows (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', steps TEXT NOT NULL, schedule TEXT NOT NULL DEFAULT 'manual', last_run INTEGER, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS workflow_runs (id TEXT PRIMARY KEY NOT NULL, workflow_id TEXT NOT NULL, input TEXT, output TEXT, log TEXT, ok INTEGER NOT NULL, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS scout_topics (id TEXT PRIMARY KEY NOT NULL, query TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, last_run INTEGER, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS scout_items (id TEXT PRIMARY KEY NOT NULL, topic_id TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL UNIQUE, source TEXT, published INTEGER, summary TEXT, importance INTEGER, seen INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS sense_rules (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, pattern TEXT NOT NULL, threshold REAL, active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS alerts (id TEXT PRIMARY KEY NOT NULL, rule_id TEXT, title TEXT NOT NULL, body TEXT, link TEXT, read INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS training_examples (id TEXT PRIMARY KEY NOT NULL, agent_id TEXT NOT NULL, input TEXT NOT NULL, output TEXT NOT NULL, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS ab_tests (id TEXT PRIMARY KEY NOT NULL, prompt TEXT NOT NULL, a_label TEXT NOT NULL, b_label TEXT NOT NULL, a_out TEXT, b_out TEXT, a_ms INTEGER, b_ms INTEGER, winner TEXT, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS sim_runs (id TEXT PRIMARY KEY NOT NULL, agent_id TEXT NOT NULL, scenario TEXT NOT NULL, transcript TEXT NOT NULL, score REAL, verdict TEXT, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS compete_matches (id TEXT PRIMARY KEY NOT NULL, task TEXT NOT NULL, results TEXT NOT NULL, winner_id TEXT, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS tools (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, description TEXT NOT NULL, config TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS traces (id TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL, ref TEXT, title TEXT NOT NULL, steps TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 1, ms INTEGER, created_at INTEGER NOT NULL);
+  CREATE INDEX IF NOT EXISTS idx_traces_ts ON traces(created_at);
+  `,
 ]
 
 export async function initDb(): Promise<void> {
@@ -121,4 +152,9 @@ export async function audit(action: string, detail?: string | null, userId?: str
   } catch { /* never block on audit */ }
 }
 
-export const TABLES = ['users', 'settings', 'agents', 'conversations', 'messages', 'memories', 'router_log', 'audit_log'] as const
+export const TABLES = [
+  'users', 'settings', 'agents', 'conversations', 'messages', 'memories', 'router_log', 'audit_log',
+  'knowledge_docs', 'knowledge_chunks', 'personas', 'agent_versions', 'engine_runs', 'forge_proposals', 'syndicate',
+  'workflows', 'workflow_runs', 'scout_topics', 'scout_items', 'sense_rules', 'alerts', 'training_examples',
+  'ab_tests', 'sim_runs', 'compete_matches', 'tools', 'traces',
+] as const

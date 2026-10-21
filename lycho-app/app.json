@@ -18,7 +18,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT", "INTERNET"]
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "INTERNET"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -36,7 +40,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#070707"
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": false
