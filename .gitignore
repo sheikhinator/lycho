@@ -44,3 +44,8 @@ next-env.d.ts
 # personal files
 *.docx
 ultimate-telegram-ai-assistant.json
+
+# env files (keys never go in the repo)
+.env
+.env.*
+!.env.example

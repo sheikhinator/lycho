@@ -1,0 +1,41 @@
+import type { IconName } from '@/components/ui'
+
+// Every LYCHO module from the website, re-planned for an on-phone app. `phase` = build phase it lands in.
+export type Module = { id: string; name: string; desc: string; icon: IconName; phase: number; route?: string }
+
+export const MODULES: Module[] = [
+  { id: 'agents', name: 'Agents', desc: '370+ specialists across 20 sectors', icon: 'cpu', phase: 1, route: '/agents' },
+  { id: 'chat', name: 'Chat', desc: 'Talk to any agent, with history', icon: 'message-square', phase: 1, route: '/chats' },
+  { id: 'router', name: 'Smart Router', desc: 'Gemini · Groq · OpenRouter, auto-switching', icon: 'shuffle', phase: 1, route: '/router' },
+  { id: 'studio', name: 'Agent Studio', desc: 'Build and edit your own agents', icon: 'edit-3', phase: 1, route: '/agent/edit' },
+  { id: 'master', name: 'Master Panel', desc: 'Owner control room', icon: 'shield', phase: 1, route: '/master' },
+  { id: 'knowledge', name: 'Knowledge Base', desc: 'Your docs, searchable by every agent', icon: 'book-open', phase: 2 },
+  { id: 'memory', name: 'Memory Graph', desc: 'Agents remember what matters', icon: 'git-branch', phase: 2 },
+  { id: 'persona', name: 'Personas', desc: 'Tone, style and identity per agent', icon: 'user', phase: 2 },
+  { id: 'marketplace', name: 'Marketplace', desc: 'Install agent packs on-phone', icon: 'shopping-bag', phase: 2 },
+  { id: 'forge', name: 'Forge', desc: 'Designs new agents automatically', icon: 'zap', phase: 3 },
+  { id: 'orion', name: 'Orion', desc: 'Optimises agents from your usage', icon: 'trending-up', phase: 3 },
+  { id: 'evolve', name: 'Evolve', desc: 'Agents improve their own prompts', icon: 'refresh-cw', phase: 3 },
+  { id: 'heal', name: 'Heal', desc: 'Self-repair for failing agents', icon: 'activity', phase: 3 },
+  { id: 'oracle', name: 'Oracle', desc: 'Ask questions across all your data', icon: 'eye', phase: 3 },
+  { id: 'predict', name: 'Predict', desc: 'Forecasts from your history', icon: 'bar-chart-2', phase: 3 },
+  { id: 'syndicate', name: 'Syndicate', desc: 'Agents message each other', icon: 'radio', phase: 3 },
+  { id: 'swarm', name: 'Swarm', desc: 'Many agents on one task at once', icon: 'grid', phase: 3 },
+  { id: 'nexus', name: 'Nexus', desc: 'Orchestrated multi-agent plans', icon: 'share-2', phase: 3 },
+  { id: 'workflows', name: 'Workflows', desc: 'Visual multi-step automations', icon: 'git-merge', phase: 3 },
+  { id: 'scout', name: 'Scout', desc: 'Crawls the web for your topics', icon: 'compass', phase: 4 },
+  { id: 'sense', name: 'Sense', desc: 'Signals and alerts from the world', icon: 'bell', phase: 4 },
+  { id: 'voice', name: 'Voice', desc: 'Talk to agents, hear them reply', icon: 'mic', phase: 4 },
+  { id: 'analytics', name: 'Analytics', desc: 'Usage, speed and cost insights', icon: 'pie-chart', phase: 4 },
+  { id: 'abtesting', name: 'A/B Lab', desc: 'Compare prompts and models', icon: 'columns', phase: 4 },
+  { id: 'training', name: 'Training', desc: 'Teach agents with examples', icon: 'award', phase: 4 },
+  { id: 'simulate', name: 'Simulate', desc: 'Dry-run agents on scenarios', icon: 'play-circle', phase: 4 },
+  { id: 'compete', name: 'Compete', desc: 'Agents face off on a task', icon: 'flag', phase: 4 },
+  { id: 'economy', name: 'Economy', desc: 'Token budgets and agent credits', icon: 'dollar-sign', phase: 4 },
+  { id: 'society', name: 'Society', desc: 'Your agents as a living society', icon: 'users', phase: 4 },
+  { id: 'channels', name: 'Channels', desc: 'Share-to-LYCHO, SMS and email drafts', icon: 'send', phase: 4 },
+  { id: 'gateway', name: 'Gateway & MCP', desc: 'Connect tools and APIs', icon: 'link', phase: 4 },
+  { id: 'world', name: 'LYCHO World', desc: 'Pixel world of your agent society', icon: 'map', phase: 5 },
+  { id: 'portal', name: 'Portal', desc: 'Shareable agent pages and exports', icon: 'globe', phase: 5 },
+  { id: 'audit', name: 'Audit & Observe', desc: 'Full trace of every action', icon: 'list', phase: 5 },
+]

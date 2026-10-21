@@ -1,0 +1,95 @@
+name: Build LYCHO APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lycho-app/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: lycho-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: lycho-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lycho-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('lycho-app/package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      # Same key every build, so new APKs install over the old one and your on-phone data is kept.
+      - name: Use LYCHO signing key
+        run: cp signing/lycho.keystore android/app/debug.keystore
+
+      - name: Version from run number
+        run: |
+          sed -i "s/versionCode [0-9]\+/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          grep versionCode android/app/build.gradle
+
+      - name: Build release APK
+        working-directory: lycho-app/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Name the APK
+        run: |
+          mkdir -p ../out
+          cp android/app/build/outputs/apk/release/app-release.apk ../out/LYCHO-${{ github.run_number }}.apk
+          ls -la ../out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LYCHO-${{ github.run_number }}
+          path: out/LYCHO-${{ github.run_number }}.apk
+          retention-days: 30
+
+      # Also publish as a GitHub Release so the APK has a direct download link on your phone.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-${{ github.run_number }}
+          name: LYCHO build ${{ github.run_number }}
+          body: |
+            On-device LYCHO, build ${{ github.run_number }} (commit ${{ github.sha }}).
+            Download the APK below and install. It updates over earlier builds and keeps your data.
+          files: out/LYCHO-${{ github.run_number }}.apk
+          make_latest: true

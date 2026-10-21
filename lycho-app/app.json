@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "LYCHO",
+    "slug": "lycho",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "lycho",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070707",
+    "android": {
+      "package": "com.lycho.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#070707",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT", "INTERNET"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-font",
+      "expo-sharing",
+      "expo-local-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#070707"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
