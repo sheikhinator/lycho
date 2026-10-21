@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { Text, View } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import * as SystemUI from 'expo-system-ui'
@@ -22,9 +22,19 @@ void SystemUI.setBackgroundColorAsync(C.void).catch(() => {})
 
 function Gate() {
   const { ready, user, locked, error } = useSession()
+  const segments = useSegments()
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => {})
   }, [ready])
+  // Always land on the right screen: sign-in when signed out, lock when locked, home otherwise.
+  useEffect(() => {
+    if (!ready || error) return
+    const first = segments[0] as string | undefined
+    const authScreens = ['sign-in', 'signup', 'forgot']
+    if (!user && !authScreens.includes(first ?? '')) router.replace('/sign-in')
+    else if (user && locked && first !== 'lock') router.replace('/lock')
+    else if (user && !locked && (first === undefined || authScreens.includes(first) || first === 'lock')) router.replace('/')
+  }, [ready, error, user, locked, segments])
   if (!ready) return null
   if (error) {
     return (
